@@ -1,6 +1,5 @@
 use crate::collections::LockedQueue;
 use crate::locked_waker::*;
-use crossbeam::queue::ArrayQueue;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::task::Context;
 
@@ -64,13 +63,13 @@ impl RegistryTrait for RegistryDummy {
 }
 
 pub struct RegistrySingle {
-    queue: ArrayQueue<LockedWakerRef>,
+    cell: WakerCell,
 }
 
 impl RegistrySingle {
     #[inline(always)]
     pub fn new() -> Registry {
-        Registry::Single(Self { queue: ArrayQueue::new(1) })
+        Registry::Single(Self { cell: WakerCell::new() })
     }
 }
 
@@ -79,42 +78,25 @@ impl RegistryTrait for RegistrySingle {
     #[inline(always)]
     fn reg_async(&self, ctx: &mut Context) -> LockedWaker {
         let waker = LockedWaker::new(ctx, 0);
-        match self.queue.push(waker.weak()) {
-            Ok(_) => {}
-            Err(_weak) => {
-                if let Some(old_waker) = self.queue.pop() {
-                    _weak.check_eq(old_waker);
-                    self.queue.push(_weak).expect("Do not misuse mpsc as mpmc");
-                } else {
-                    self.queue.push(_weak).expect("Do not misuse mpsc as mpmc");
-                }
-            }
-        }
+        self.cell.put(waker.weak());
         waker
     }
 
     #[inline(always)]
-    fn cancel_waker(&self, waker: LockedWaker) {
+    fn cancel_waker(&self, _waker: LockedWaker) {
         // Got to be it, because only one single thread.
-        if let Some(waker_ref) = self.queue.pop() {
-            // protect miss-use of multi thread
-            waker.weak().check_eq(waker_ref);
-        }
+        self.cell.clear();
     }
 
     #[inline(always)]
     fn clear_wakers(&self, _seq: u64) {
         // Got to be it, because only one single thread.
-        if let Some(_waker) = self.queue.pop() {
-            _waker.wake();
-        }
+        self.cell.clear();
     }
 
     #[inline(always)]
     fn fire(&self) {
-        if let Some(waker) = self.queue.pop() {
-            waker.wake();
-        }
+        self.cell.wake();
     }
 
     #[inline(always)]
@@ -125,7 +107,11 @@ impl RegistryTrait for RegistrySingle {
     /// return waker queue size
     #[inline(always)]
     fn get_size(&self) -> usize {
-        self.queue.len()
+        if self.cell.exists() {
+            1
+        } else {
+            0
+        }
     }
 }
 

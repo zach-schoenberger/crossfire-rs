@@ -1,3 +1,4 @@
+use crate::collections::WeakCell;
 use std::fmt;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -21,9 +22,7 @@ struct LockedWakerInner {
     seq: u64,
 }
 
-pub struct LockedWakerRef {
-    w: Weak<LockedWakerInner>,
-}
+pub struct LockedWakerRef(Weak<LockedWakerInner>);
 
 impl fmt::Debug for LockedWakerRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -61,7 +60,7 @@ impl LockedWaker {
 
     #[inline(always)]
     pub(crate) fn weak(&self) -> LockedWakerRef {
-        LockedWakerRef { w: Arc::downgrade(&self.0) }
+        LockedWakerRef(Arc::downgrade(&self.0))
     }
 
     #[inline(always)]
@@ -84,7 +83,7 @@ impl LockedWaker {
 impl LockedWakerRef {
     #[inline(always)]
     pub(crate) fn wake(&self) -> bool {
-        if let Some(_self) = self.w.upgrade() {
+        if let Some(_self) = self.0.upgrade() {
             return LockedWaker(_self).wake();
         } else {
             return false;
@@ -93,7 +92,7 @@ impl LockedWakerRef {
 
     /// return true to stop; return false to continue the search.
     pub(crate) fn try_to_clear(&self, seq: u64) -> bool {
-        if let Some(w) = self.w.upgrade() {
+        if let Some(w) = self.0.upgrade() {
             let waker = LockedWaker(w);
             let _seq = waker.get_seq();
             if _seq == seq {
@@ -111,9 +110,10 @@ impl LockedWakerRef {
         return false;
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub(crate) fn check_eq(&self, other: LockedWakerRef) -> bool {
-        if self.w.ptr_eq(&other.w) {
+        if self.0.ptr_eq(&other.0) {
             return true;
         }
         other.wake();
@@ -121,7 +121,45 @@ impl LockedWakerRef {
     }
 }
 
-#[test]
-fn test_waker() {
-    println!("waker size {}", std::mem::size_of::<LockedWakerRef>());
+pub struct WakerCell(WeakCell<LockedWakerInner>);
+
+impl WakerCell {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self(WeakCell::new())
+    }
+
+    #[inline(always)]
+    pub fn wake(&self) -> bool {
+        if let Some(waker) = self.0.pop() {
+            return LockedWaker(waker).wake();
+        }
+        false
+    }
+
+    #[inline(always)]
+    pub fn clear(&self) {
+        self.0.clear();
+    }
+
+    #[inline(always)]
+    pub fn put(&self, waker: LockedWakerRef) {
+        self.0.put(waker.0);
+    }
+
+    #[inline(always)]
+    pub fn exists(&self) -> bool {
+        self.0.exists()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_waker() {
+        println!("waker size {}", std::mem::size_of::<LockedWakerRef>());
+        println!("arc size {}", std::mem::size_of::<Arc<WakerCell>>());
+        println!("arc size {}", std::mem::size_of::<Weak<WakerCell>>());
+    }
 }
