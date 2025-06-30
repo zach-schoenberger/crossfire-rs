@@ -294,12 +294,8 @@ impl<T: Unpin + Send + 'static> Future for SendFuture<'_, T> {
         let tx = _self.tx;
         let r = tx.poll_send(ctx, item, &mut _self.waker);
         match r {
-            Ok(()) => {
-                Poll::Ready(Ok(()))
-            }
-            Err(TrySendError::Disconnected(t)) => {
-                Poll::Ready(Err(SendError(t)))
-            }
+            Ok(()) => Poll::Ready(Ok(())),
+            Err(TrySendError::Disconnected(t)) => Poll::Ready(Err(SendError(t))),
             Err(TrySendError::Full(t)) => {
                 _self.item.replace(t);
                 Poll::Pending

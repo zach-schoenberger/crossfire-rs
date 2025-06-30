@@ -3,8 +3,8 @@ use crate::*;
 use log::*;
 use rstest::*;
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 use tokio::time::*;
 
@@ -156,7 +156,7 @@ async fn test_basic_unbounded_idle_select<T: BlockingTxTrait<i32>, R: AsyncRxTra
     setup_log; // Disable unused var warning
     let (_tx, rx) = channel;
 
-    use futures::{FutureExt, pin_mut, select};
+    use futures::{pin_mut, select, FutureExt};
 
     async fn loop_fn() {
         tokio::time::sleep(Duration::from_millis(1)).await;
@@ -350,7 +350,9 @@ async fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
         let _round = round;
         tokio::spawn(async move {
             for i in 0.._round {
-                if let Err(e) = _tx.send(i).await { panic!("{:?}", e) }
+                if let Err(e) = _tx.send(i).await {
+                    panic!("{:?}", e)
+                }
             }
             let _ = _noti_tx.send(_tx_i).await;
             info!("tx {} exit", _tx_i);
@@ -406,7 +408,9 @@ async fn test_pressure_bounded_async_multi(
         let _round = round;
         tokio::spawn(async move {
             for i in 0.._round {
-                if let Err(e) = _tx.send(i).await { panic!("{:?}", e) }
+                if let Err(e) = _tx.send(i).await {
+                    panic!("{:?}", e)
+                }
             }
             let _ = _noti_tx.send(_tx_i).await;
             info!("tx {} exit", _tx_i);

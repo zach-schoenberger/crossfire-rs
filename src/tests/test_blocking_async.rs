@@ -3,8 +3,8 @@ use crate::*;
 use log::*;
 use rstest::*;
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 use std::thread;
 use std::time::*;

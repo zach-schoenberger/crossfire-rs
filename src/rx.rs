@@ -147,9 +147,7 @@ impl<T> AsyncRx<T> {
     #[inline(always)]
     pub async fn recv(&self) -> Result<T, RecvError> {
         match self.try_recv() {
-            Err(TryRecvError::Disconnected) => {
-                Err(RecvError {})
-            }
+            Err(TryRecvError::Disconnected) => Err(RecvError {}),
             Ok(item) => Ok(item),
             _ => {
                 return ReceiveFuture { rx: self, waker: None }.await;
@@ -310,9 +308,7 @@ impl<T> Future for ReceiveFuture<'_, T> {
                     Poll::Pending
                 }
             }
-            Ok(item) => {
-                Poll::Ready(Ok(item))
-            }
+            Ok(item) => Poll::Ready(Ok(item)),
         }
     }
 }

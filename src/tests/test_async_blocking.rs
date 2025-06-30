@@ -2,8 +2,8 @@ use super::common::*;
 use crate::*;
 use log::*;
 use rstest::*;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -143,7 +143,9 @@ fn test_pressure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxT
     let rt = get_runtime();
     rt.block_on(async move {
         for i in 0..round {
-            if let Err(e) = tx.send(i).await { panic!("{}", e) }
+            if let Err(e) = tx.send(i).await {
+                panic!("{}", e)
+            }
         }
         debug!("tx exit");
     });
@@ -190,7 +192,9 @@ fn test_pressure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
             let mut _noti_tx = noti_tx.clone();
             tokio::spawn(async move {
                 for i in 0..round {
-                    if let Err(e) = _tx.send(i).await { panic!("{}", e) }
+                    if let Err(e) = _tx.send(i).await {
+                        panic!("{}", e)
+                    }
                 }
                 let _ = _noti_tx.send(_tx_i).await;
                 debug!("tx {} exit", _tx_i);
@@ -250,7 +254,9 @@ fn test_pressure_multi_tx_async_multi_rx_blocking(
             let mut _noti_tx = noti_tx.clone();
             tokio::spawn(async move {
                 for i in 0..round {
-                    if let Err(e) = _tx.send(i).await { panic!("{}", e) }
+                    if let Err(e) = _tx.send(i).await {
+                        panic!("{}", e)
+                    }
                 }
                 let _ = _noti_tx.send(_tx_i).await;
                 debug!("tx {} exit", _tx_i);
