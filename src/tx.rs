@@ -42,10 +42,10 @@ impl<T> Tx<T> {
     #[inline]
     pub fn send(&self, item: T) -> Result<(), SendError<T>> {
         match self.sender.send(item) {
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
             Ok(_) => {
                 self.shared.on_send();
-                return Ok(());
+                Ok(())
             }
         }
     }
@@ -60,10 +60,10 @@ impl<T> Tx<T> {
     #[inline]
     pub fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
         match self.sender.try_send(item) {
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
             Ok(_) => {
                 self.shared.on_send();
-                return Ok(());
+                Ok(())
             }
         }
     }
@@ -79,10 +79,10 @@ impl<T> Tx<T> {
     #[inline]
     pub fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>> {
         match self.sender.send_timeout(item, timeout) {
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
             Ok(_) => {
                 self.shared.on_recv();
-                return Ok(());
+                Ok(())
             }
         }
     }
@@ -133,18 +133,18 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
     #[inline(always)]
     pub async fn send(&self, item: T) -> Result<(), SendError<T>> {
         match self.try_send(item) {
-            Ok(()) => return Ok(()),
+            Ok(()) => Ok(()),
             Err(TrySendError::Full(t)) => {
-                return SendFuture { tx: &self, item: Some(t), waker: None }.await;
+                return SendFuture { tx: self, item: Some(t), waker: None }.await;
             }
-            Err(TrySendError::Disconnected(t)) => return Err(SendError(t)),
+            Err(TrySendError::Disconnected(t)) => Err(SendError(t)),
         }
     }
 
     /// Generate a fixed Sized future object that send a message
     #[inline(always)]
     pub fn make_send_future<'a>(&'a self, item: T) -> SendFuture<'a, T> {
-        return SendFuture { tx: &self, item: Some(item), waker: None };
+        SendFuture { tx: self, item: Some(item), waker: None }
     }
 
     /// This is only useful when you're writing your own future.
@@ -198,14 +198,14 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
             // Ok or Disconnected
             self.shared.cancel_send_waker(waker);
         }
-        return r;
+        r
     }
 
     /// Just for debugging purpose, to monitor queue size
     #[inline]
     #[cfg(test)]
     pub fn get_waker_size(&self) -> (usize, usize) {
-        return self.shared.get_waker_size();
+        self.shared.get_waker_size()
     }
 }
 
@@ -225,10 +225,10 @@ impl<T> AsyncTx<T> {
     #[inline]
     pub fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
         match self.sender.try_send(item) {
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
             Ok(_) => {
                 self.shared.on_send();
-                return Ok(());
+                Ok(())
             }
         }
     }
@@ -257,9 +257,9 @@ impl<T> AsyncTx<T> {
         match self.sender.send(item) {
             Ok(()) => {
                 self.shared.on_send();
-                return Ok(());
+                Ok(())
             }
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
         }
     }
 }
@@ -295,14 +295,14 @@ impl<T: Unpin + Send + 'static> Future for SendFuture<'_, T> {
         let r = tx.poll_send(ctx, item, &mut _self.waker);
         match r {
             Ok(()) => {
-                return Poll::Ready(Ok(()));
+                Poll::Ready(Ok(()))
             }
             Err(TrySendError::Disconnected(t)) => {
-                return Poll::Ready(Err(SendError(t)));
+                Poll::Ready(Err(SendError(t)))
             }
             Err(TrySendError::Full(t)) => {
                 _self.item.replace(t);
-                return Poll::Pending;
+                Poll::Pending
             }
         }
     }
@@ -356,7 +356,7 @@ impl<T: Send + 'static> BlockingTxTrait<T> for Tx<T> {
 
     #[inline(always)]
     fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>> {
-        Tx::send_timeout(&self, item, timeout)
+        Tx::send_timeout(self, item, timeout)
     }
 
     #[inline(always)]

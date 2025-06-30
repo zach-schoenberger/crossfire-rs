@@ -79,7 +79,7 @@
 //! </table>
 //!
 //! > **NOTE**: For SP / SC version [AsyncTx] and [AsyncRx], although not designed to be not cloneable,
-//! send() recv() use immutable &self for convenient reason. Be careful do not use the SP / SC concurrently when put in Arc.
+//! > send() recv() use immutable &self for convenient reason. Be careful do not use the SP / SC concurrently when put in Arc.
 //!
 //! ### Error types
 //!

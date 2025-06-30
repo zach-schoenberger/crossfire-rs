@@ -40,7 +40,7 @@ where
                     return Poll::Pending;
                 }
                 _self.ended = true;
-                return Poll::Ready(None);
+                Poll::Ready(None)
             }
             Ok(item) => Poll::Ready(Some(item)),
         }

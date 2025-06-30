@@ -92,7 +92,7 @@ impl<T> DerefMut for MAsyncRx<T> {
 
 impl<T: Send + 'static> BlockingRxTrait<T> for MRx<T> {
     #[inline(always)]
-    fn recv<'a>(&'a self) -> Result<T, RecvError> {
+    fn recv(&self) -> Result<T, RecvError> {
         self.0.recv()
     }
 

@@ -16,7 +16,7 @@ use tokio::time::*;
 async fn test_basic_bounded_rx_drop<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let tx = {
         let (tx, _rx) = channel;
         tx.send(1).await.expect("ok");
@@ -40,7 +40,7 @@ async fn test_basic_bounded_rx_drop<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usiz
 async fn test_basic_unbounded_rx_drop<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let tx = {
         let (tx, _rx) = channel;
         tx.send(1).expect("ok");
@@ -64,7 +64,7 @@ async fn test_basic_unbounded_rx_drop<T: BlockingTxTrait<usize>, R: AsyncRxTrait
 async fn test_basic_bounded_1_thread<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
     let rx_res = rx.try_recv();
     assert!(rx_res.is_err());
@@ -110,7 +110,7 @@ async fn test_basic_bounded_1_thread<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>
 async fn test_basic_unbounded_1_thread<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
-    let _ = setup_log;
+    setup_log;
     let (tx, rx) = channel;
     let rx_res = rx.try_recv();
     assert!(rx_res.is_err());
@@ -153,7 +153,7 @@ async fn test_basic_unbounded_1_thread<T: BlockingTxTrait<i32>, R: AsyncRxTrait<
 async fn test_basic_unbounded_idle_select<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (_tx, rx) = channel;
 
     use futures::{FutureExt, pin_mut, select};
@@ -191,12 +191,12 @@ async fn test_basic_unbounded_idle_select<T: BlockingTxTrait<i32>, R: AsyncRxTra
 async fn test_basic_bounded_recv_after_sender_close<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
     // NOTE: 5 < 10
     let total_msg_count = 5;
     for i in 0..total_msg_count {
-        let _ = tx.try_send(i).expect("send ok");
+        tx.try_send(i).expect("send ok");
     }
     drop(tx);
     let mut recv_msg_count = 0;
@@ -224,11 +224,11 @@ async fn test_basic_unbounded_recv_after_sender_close<
 >(
     setup_log: (), #[case] channel: (T, R),
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
     let total_msg_count = 500;
     for i in 0..total_msg_count {
-        let _ = tx.send(i).expect("send ok");
+        tx.send(i).expect("send ok");
     }
     drop(tx);
     let mut recv_msg_count = 0;
@@ -253,7 +253,7 @@ async fn test_basic_unbounded_recv_after_sender_close<
 async fn test_timeout_recv_async<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
     for _ in 0..1000 {
         assert!(timeout(Duration::from_millis(1), rx.recv()).await.is_err());
@@ -288,7 +288,7 @@ async fn test_timeout_recv_async<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
 async fn test_pressure_bounded_async_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -339,7 +339,7 @@ async fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
 ) {
     let (noti_tx, mut noti_rx) = tokio::sync::mpsc::channel::<usize>(tx_count);
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -350,10 +350,7 @@ async fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
         let _round = round;
         tokio::spawn(async move {
             for i in 0.._round {
-                match _tx.send(i).await {
-                    Err(e) => panic!("{:?}", e),
-                    _ => {}
-                }
+                if let Err(e) = _tx.send(i).await { panic!("{:?}", e) }
             }
             let _ = _noti_tx.send(_tx_i).await;
             info!("tx {} exit", _tx_i);
@@ -398,7 +395,7 @@ async fn test_pressure_bounded_async_multi(
     #[case] rx_count: usize,
 ) {
     let (noti_tx, mut noti_rx) = tokio::sync::mpsc::channel::<usize>(tx_count + rx_count);
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -409,10 +406,7 @@ async fn test_pressure_bounded_async_multi(
         let _round = round;
         tokio::spawn(async move {
             for i in 0.._round {
-                match _tx.send(i).await {
-                    Err(e) => panic!("{:?}", e),
-                    _ => {}
-                }
+                if let Err(e) = _tx.send(i).await { panic!("{:?}", e) }
             }
             let _ = _noti_tx.send(_tx_i).await;
             info!("tx {} exit", _tx_i);

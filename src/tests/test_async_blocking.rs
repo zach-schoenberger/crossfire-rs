@@ -15,7 +15,7 @@ use std::time::Duration;
 async fn test_basic_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let rx_res = rx.try_recv();
@@ -59,7 +59,7 @@ async fn test_basic_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: Blocking
 fn test_basic_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let rx_res = rx.try_recv();
@@ -121,7 +121,7 @@ fn test_basic_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
 fn test_pressure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -143,10 +143,7 @@ fn test_pressure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxT
     let rt = get_runtime();
     rt.block_on(async move {
         for i in 0..round {
-            match tx.send(i).await {
-                Err(e) => panic!("{}", e),
-                _ => {}
-            }
+            if let Err(e) = tx.send(i).await { panic!("{}", e) }
         }
         debug!("tx exit");
     });
@@ -166,7 +163,7 @@ fn test_pressure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxT
 fn test_pressure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -193,10 +190,7 @@ fn test_pressure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
             let mut _noti_tx = noti_tx.clone();
             tokio::spawn(async move {
                 for i in 0..round {
-                    match _tx.send(i).await {
-                        Err(e) => panic!("{}", e),
-                        _ => {}
-                    }
+                    if let Err(e) = _tx.send(i).await { panic!("{}", e) }
                 }
                 let _ = _noti_tx.send(_tx_i).await;
                 debug!("tx {} exit", _tx_i);
@@ -224,7 +218,7 @@ fn test_pressure_multi_tx_async_multi_rx_blocking(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, MRx<usize>), #[case] tx_count: usize,
     #[case] rx_count: usize,
 ) {
-    let _ = setup_log; // Disable unused var warning
+    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -256,10 +250,7 @@ fn test_pressure_multi_tx_async_multi_rx_blocking(
             let mut _noti_tx = noti_tx.clone();
             tokio::spawn(async move {
                 for i in 0..round {
-                    match _tx.send(i).await {
-                        Err(e) => panic!("{}", e),
-                        _ => {}
-                    }
+                    if let Err(e) = _tx.send(i).await { panic!("{}", e) }
                 }
                 let _ = _noti_tx.send(_tx_i).await;
                 debug!("tx {} exit", _tx_i);

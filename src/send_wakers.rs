@@ -140,7 +140,7 @@ impl SendWakersTrait for SendWakersMulti {
     fn reg_send(&self, ctx: &mut Context) -> LockedWaker {
         let seq = self.send_waker_tx_seq.fetch_add(1, Ordering::SeqCst);
         let waker = LockedWaker::new(ctx, seq);
-        let _ = self.sender_waker.push(waker.weak());
+        self.sender_waker.push(waker.weak());
         waker
     }
 

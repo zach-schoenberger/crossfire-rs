@@ -75,10 +75,10 @@ impl LockedWaker {
     pub(crate) fn wake(&self) -> bool {
         let _self = self.0.as_ref();
         let waked = _self.waked.swap(true, Ordering::SeqCst);
-        if waked == false {
+        if !waked {
             _self.waker.wake_by_ref();
         }
-        return !waked;
+        !waked
     }
 }
 
@@ -86,9 +86,9 @@ impl LockedWakerRef {
     #[inline(always)]
     pub(crate) fn wake(&self) -> bool {
         if let Some(_self) = self.w.upgrade() {
-            return LockedWaker(_self).wake();
+            LockedWaker(_self).wake()
         } else {
-            return false;
+            false
         }
     }
 
@@ -109,7 +109,7 @@ impl LockedWakerRef {
             }
             return _seq > seq;
         }
-        return false;
+        false
     }
 }
 

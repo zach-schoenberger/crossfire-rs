@@ -41,12 +41,12 @@ impl<T> Rx<T> {
     ///
     /// Returns Err([RecvError]) when all Tx dropped.
     #[inline]
-    pub fn recv<'a>(&'a self) -> Result<T, RecvError> {
+    pub fn recv(&self) -> Result<T, RecvError> {
         match self.recv.recv() {
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
             Ok(i) => {
                 self.shared.on_recv();
-                return Ok(i);
+                Ok(i)
             }
         }
     }
@@ -61,10 +61,10 @@ impl<T> Rx<T> {
     #[inline]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
             Ok(i) => {
                 self.shared.on_recv();
-                return Ok(i);
+                Ok(i)
             }
         }
     }
@@ -80,10 +80,10 @@ impl<T> Rx<T> {
     #[inline]
     pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
         match self.recv.recv_timeout(timeout) {
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
             Ok(i) => {
                 self.shared.on_recv();
-                return Ok(i);
+                Ok(i)
             }
         }
     }
@@ -148,11 +148,11 @@ impl<T> AsyncRx<T> {
     pub async fn recv(&self) -> Result<T, RecvError> {
         match self.try_recv() {
             Err(TryRecvError::Disconnected) => {
-                return Err(RecvError {});
+                Err(RecvError {})
             }
-            Ok(item) => return Ok(item),
+            Ok(item) => Ok(item),
             _ => {
-                return ReceiveFuture { rx: &self, waker: None }.await;
+                return ReceiveFuture { rx: self, waker: None }.await;
             }
         }
     }
@@ -167,10 +167,10 @@ impl<T> AsyncRx<T> {
     #[inline(always)]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
             Ok(i) => {
                 self.shared.on_recv();
-                return Ok(i);
+                Ok(i)
             }
         }
     }
@@ -178,7 +178,7 @@ impl<T> AsyncRx<T> {
     /// Generate a fixed Sized future object that receive a message
     #[inline(always)]
     pub fn make_recv_future<'a>(&'a self) -> ReceiveFuture<'a, T> {
-        return ReceiveFuture { rx: &self, waker: None };
+        ReceiveFuture { rx: self, waker: None }
     }
 
     /// Probe possible messages in the channel (not accurate)
@@ -241,7 +241,7 @@ impl<T> AsyncRx<T> {
         } else {
             self.shared.cancel_recv_waker(waker);
         }
-        return r;
+        r
     }
 
     pub fn into_stream(self) -> AsyncStream<T>
@@ -255,7 +255,7 @@ impl<T> AsyncRx<T> {
     #[inline]
     #[cfg(test)]
     pub fn get_waker_size(&self) -> (usize, usize) {
-        return self.shared.get_waker_size();
+        self.shared.get_waker_size()
     }
 
     /// Receive a message while **blocking the current thread**. Be careful!
@@ -268,10 +268,10 @@ impl<T> AsyncRx<T> {
     #[inline(always)]
     pub fn recv_blocking(&self) -> Result<T, RecvError> {
         match self.recv.recv() {
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
             Ok(i) => {
                 self.shared.on_recv();
-                return Ok(i);
+                Ok(i)
             }
         }
     }
@@ -305,13 +305,13 @@ impl<T> Future for ReceiveFuture<'_, T> {
         match _self.rx.poll_item(ctx, &mut _self.waker) {
             Err(e) => {
                 if !e.is_empty() {
-                    return Poll::Ready(Err(RecvError {}));
+                    Poll::Ready(Err(RecvError {}))
                 } else {
-                    return Poll::Pending;
+                    Poll::Pending
                 }
             }
             Ok(item) => {
-                return Poll::Ready(Ok(item));
+                Poll::Ready(Ok(item))
             }
         }
     }
@@ -336,7 +336,7 @@ pub trait BlockingRxTrait<T: Send + 'static>: Send + 'static {
     /// Returns `Ok(T)` when successful.
     ///
     /// Returns Err([RecvError]) when all Tx dropped.
-    fn recv<'a>(&'a self) -> Result<T, RecvError>;
+    fn recv(&self) -> Result<T, RecvError>;
 
     /// Try to receive message, non-blocking.
     ///
@@ -366,7 +366,7 @@ pub trait BlockingRxTrait<T: Send + 'static>: Send + 'static {
 
 impl<T: Send + 'static> BlockingRxTrait<T> for Rx<T> {
     #[inline(always)]
-    fn recv<'a>(&'a self) -> Result<T, RecvError> {
+    fn recv(&self) -> Result<T, RecvError> {
         Rx::recv(self)
     }
 
