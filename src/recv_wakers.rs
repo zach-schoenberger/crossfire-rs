@@ -29,6 +29,7 @@ pub trait RecvWakersTrait {
 pub struct RecvWakersBlocking();
 
 impl RecvWakersBlocking {
+    #[allow(clippy::new_ret_no_self)]
     #[inline(always)]
     pub fn new() -> RecvWakers {
         RecvWakers::Blocking(Self())
@@ -66,6 +67,7 @@ pub struct RecvWakersSingle {
 }
 
 impl RecvWakersSingle {
+    #[allow(clippy::new_ret_no_self)]
     #[inline(always)]
     pub fn new() -> RecvWakers {
         RecvWakers::Single(Self { recv_waker: ArrayQueue::new(1) })
@@ -124,6 +126,7 @@ pub struct RecvWakersMulti {
 }
 
 impl RecvWakersMulti {
+    #[allow(clippy::new_ret_no_self)]
     #[inline(always)]
     pub fn new() -> RecvWakers {
         RecvWakers::Multi(Self {

@@ -13,9 +13,8 @@ use std::time::Duration;
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(100))]
 #[tokio::test]
 async fn test_basic_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTrait<usize>>(
-    setup_log: (), #[case] channel: (T, R),
+    _setup_log: (), #[case] channel: (T, R),
 ) {
-    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let rx_res = rx.try_recv();
@@ -57,9 +56,8 @@ async fn test_basic_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: Blocking
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 100)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 1000)]
 fn test_basic_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
-    setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
+    _setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
 ) {
-    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let rx_res = rx.try_recv();
@@ -119,9 +117,8 @@ fn test_basic_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(100))]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(1000))]
 fn test_pressure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTrait<usize>>(
-    setup_log: (), #[case] channel: (T, R),
+    _setup_log: (), #[case] channel: (T, R),
 ) {
-    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -163,9 +160,8 @@ fn test_pressure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxT
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 10)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(100), 200)]
 fn test_pressure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
-    setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
+    _setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
 ) {
-    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -219,10 +215,9 @@ fn test_pressure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 10, 1000)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(100), 500, 500)]
 fn test_pressure_multi_tx_async_multi_rx_blocking(
-    setup_log: (), #[case] channel: (MAsyncTx<usize>, MRx<usize>), #[case] tx_count: usize,
+    _setup_log: (), #[case] channel: (MAsyncTx<usize>, MRx<usize>), #[case] tx_count: usize,
     #[case] rx_count: usize,
 ) {
-    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let counter = Arc::new(AtomicUsize::new(0));

@@ -29,6 +29,7 @@ pub trait SendWakersTrait {
 pub struct SendWakersBlocking {}
 
 impl SendWakersBlocking {
+    #[allow(clippy::new_ret_no_self)]
     #[inline(always)]
     pub fn new() -> SendWakers {
         SendWakers::Blocking(Self {})
@@ -67,6 +68,7 @@ pub struct SendWakersSingle {
 }
 
 impl SendWakersSingle {
+    #[allow(clippy::new_ret_no_self)]
     #[inline(always)]
     pub fn new() -> SendWakers {
         SendWakers::Single(Self { sender_waker: ArrayQueue::new(1) })
@@ -125,6 +127,7 @@ pub struct SendWakersMulti {
 }
 
 impl SendWakersMulti {
+    #[allow(clippy::new_ret_no_self)]
     #[inline(always)]
     pub fn new() -> SendWakers {
         SendWakers::Multi(Self {

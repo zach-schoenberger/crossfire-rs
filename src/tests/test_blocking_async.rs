@@ -15,9 +15,8 @@ use std::time::*;
 #[case(mpmc::bounded_tx_blocking_rx_async::<usize>(10))]
 #[tokio::test]
 async fn test_basic_1_tx_blocking_1_rx_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize>>(
-    setup_log: (), #[case] channel: (T, R),
+    _setup_log: (), #[case] channel: (T, R),
 ) {
-    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
     let rx_res = rx.try_recv();
     assert!(rx_res.is_err());
@@ -67,9 +66,8 @@ async fn test_pressure_1_tx_blocking_1_rx_async<
     T: BlockingTxTrait<usize>,
     R: AsyncRxTrait<usize>,
 >(
-    setup_log: (), #[case] channel: (T, R),
+    _setup_log: (), #[case] channel: (T, R),
 ) {
-    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
     let round: usize = 100000;
     let th = thread::spawn(move || {
@@ -113,9 +111,8 @@ async fn test_pressure_1_tx_blocking_1_rx_async<
 #[case(mpmc::unbounded_async::<usize>(), 1000)]
 #[tokio::test]
 async fn test_pressure_tx_multi_blocking_1_rx_async<R: AsyncRxTrait<usize>>(
-    setup_log: (), #[case] channel: (MTx<usize>, R), #[case] tx_count: usize,
+    _setup_log: (), #[case] channel: (MTx<usize>, R), #[case] tx_count: usize,
 ) {
-    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
     let counter = Arc::new(AtomicUsize::new(0));
     let round = 1000000;
@@ -178,10 +175,9 @@ async fn test_pressure_tx_multi_blocking_1_rx_async<R: AsyncRxTrait<usize>>(
 #[case(mpmc::unbounded_async::<usize>(), 30, 1000)]
 #[tokio::test]
 async fn test_pressure_tx_multi_blocking_multi_rx_async(
-    setup_log: (), #[case] channel: (MTx<usize>, MAsyncRx<usize>), #[case] tx_count: usize,
+    _setup_log: (), #[case] channel: (MTx<usize>, MAsyncRx<usize>), #[case] tx_count: usize,
     #[case] rx_count: usize,
 ) {
-    setup_log; // Disable unused var warning
     let (tx, rx) = channel;
 
     let counter = Arc::new(AtomicUsize::new(0));

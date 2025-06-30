@@ -139,7 +139,7 @@ async fn _flume_unbounded_async(tx_count: usize, rx_count: usize, msg_count: usi
             loop {
                 let i = _counter.fetch_add(1, Ordering::SeqCst);
                 if i < msg_count {
-                    if let Err(e) = _tx.send(i) {
+                    if let Err(e) = _tx.send_async(i).await {
                         panic!("send error: {:?}", e);
                     }
                 } else {
@@ -154,27 +154,13 @@ async fn _flume_unbounded_async(tx_count: usize, rx_count: usize, msg_count: usi
         let _rx = rx.clone();
         let _recv_counter = recv_counter.clone();
         th_s.push(tokio::spawn(async move {
-            loop {
-                match _rx.recv_async().await {
-                    Ok(_) => {
-                        let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                }
+            while _rx.recv_async().await.is_ok() {
+                let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
             }
         }));
     }
-    loop {
-        match rx.recv_async().await {
-            Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
-            }
-            Err(_) => {
-                break;
-            }
-        }
+    while rx.recv_async().await.is_ok() {
+        let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
     }
     for th in th_s {
         let _ = th.await;
@@ -209,27 +195,13 @@ async fn _flume_bounded_async(bound: usize, tx_count: usize, rx_count: usize, ms
         let _rx = rx.clone();
         let _recv_counter = recv_counter.clone();
         th_s.push(tokio::spawn(async move {
-            loop {
-                match _rx.recv_async().await {
-                    Ok(_) => {
-                        let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                }
+            while _rx.recv_async().await.is_ok() {
+                let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
             }
         }));
     }
-    loop {
-        match rx.recv_async().await {
-            Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
-            }
-            Err(_) => {
-                break;
-            }
-        }
+    while rx.recv_async().await.is_ok() {
+        let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
     }
     for th in th_s {
         let _ = th.await;
@@ -264,27 +236,13 @@ async fn _kanal_bounded_async(bound: usize, tx_count: usize, rx_count: usize, ms
         let _rx = rx.clone();
         let _recv_counter = recv_counter.clone();
         th_s.push(tokio::spawn(async move {
-            loop {
-                match _rx.recv().await {
-                    Ok(_) => {
-                        let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                }
+            while _rx.recv().await.is_ok() {
+                let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
             }
         }));
     }
-    loop {
-        match rx.recv().await {
-            Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
-            }
-            Err(_) => {
-                break;
-            }
-        }
+    while rx.recv().await.is_ok() {
+        let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
     }
     for th in th_s {
         let _ = th.await;
@@ -319,27 +277,13 @@ async fn _kanal_unbounded_async(tx_count: usize, rx_count: usize, msg_count: usi
         let _rx = rx.clone();
         let _recv_counter = recv_counter.clone();
         th_s.push(tokio::spawn(async move {
-            loop {
-                match _rx.recv().await {
-                    Ok(_) => {
-                        let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                }
+            while _rx.recv().await.is_ok() {
+                let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
             }
         }));
     }
-    loop {
-        match rx.recv().await {
-            Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
-            }
-            Err(_) => {
-                break;
-            }
-        }
+    while rx.recv().await.is_ok() {
+        let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
     }
     for th in th_s {
         let _ = th.await;
@@ -397,28 +341,14 @@ async fn _crossfire_blocking_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<us
         let _rx = rxs.pop().unwrap();
         let _recv_counter = recv_counter.clone();
         recv_th_s.push(tokio::spawn(async move {
-            loop {
-                match _rx.recv().await {
-                    Ok(_) => {
-                        let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                }
+            while _rx.recv().await.is_ok() {
+                let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
             }
         }));
     }
     let rx = rxs.pop().unwrap();
-    loop {
-        match rx.recv().await {
-            Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
-            }
-            Err(_) => {
-                break;
-            }
-        }
+    while rx.recv().await.is_ok() {
+        let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
     }
     for th in recv_th_s {
         let _ = th.await;
@@ -456,28 +386,14 @@ async fn _crossfire_bounded_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>
         let _rx = rxs.pop().unwrap();
         let _recv_counter = recv_counter.clone();
         th_s.push(tokio::spawn(async move {
-            loop {
-                match _rx.recv().await {
-                    Ok(_) => {
-                        let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                }
+            while _rx.recv().await.is_ok() {
+                let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
             }
         }));
     }
     let rx = rxs.pop().unwrap();
-    loop {
-        match rx.recv().await {
-            Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
-            }
-            Err(_) => {
-                break;
-            }
-        }
+    while rx.recv().await.is_ok() {
+        let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
     }
     for th in th_s {
         let _ = th.await;
