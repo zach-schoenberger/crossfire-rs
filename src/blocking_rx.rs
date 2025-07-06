@@ -113,7 +113,7 @@ impl<T> Clone for MRx<T> {
     fn clone(&self) -> Self {
         let inner = &self.0;
         inner.shared.add_rx();
-        Self(Rx { recv: inner.recv.clone(), shared: inner.shared.clone() })
+        Self(Rx::new(inner.recv.clone(), inner.shared.clone()))
     }
 }
 

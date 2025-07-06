@@ -19,14 +19,6 @@ pub struct AsyncRx<T> {
     pub(crate) shared: Arc<ChannelShared>,
 }
 
-impl<T> Clone for AsyncRx<T> {
-    #[inline]
-    fn clone(&self) -> Self {
-        self.shared.add_rx();
-        Self { recv: self.recv.clone(), shared: self.shared.clone() }
-    }
-}
-
 impl<T> fmt::Debug for AsyncRx<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "AsyncRx")
@@ -303,7 +295,7 @@ impl<T> Clone for MAsyncRx<T> {
     fn clone(&self) -> Self {
         let inner = &self.0;
         inner.shared.add_rx();
-        Self(AsyncRx { recv: inner.recv.clone(), shared: inner.shared.clone() })
+        Self(AsyncRx::new(inner.recv.clone(), inner.shared.clone()))
     }
 }
 
