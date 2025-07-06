@@ -145,6 +145,8 @@ extern crate enum_dispatch;
 
 mod channel;
 mod locked_waker;
+pub use locked_waker::LockedWaker;
+mod collections;
 /// Multi producers, single consumer
 pub mod mpmc;
 /// Multi producers, multi consumers
@@ -152,7 +154,6 @@ pub mod mpsc;
 /// Single producer, single consumer
 pub mod spsc;
 mod waker_registry;
-pub use locked_waker::LockedWaker;
 
 mod blocking_tx;
 pub use blocking_tx::*;

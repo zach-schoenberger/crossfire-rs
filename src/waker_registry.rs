@@ -1,5 +1,6 @@
+use crate::collections::LockedQueue;
 use crate::locked_waker::*;
-use crossbeam::queue::{ArrayQueue, SegQueue};
+use crossbeam::queue::ArrayQueue;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::task::Context;
 
@@ -129,7 +130,7 @@ impl RegistryTrait for RegistrySingle {
 }
 
 pub struct RegistryMulti {
-    queue: SegQueue<LockedWakerRef>,
+    queue: LockedQueue<LockedWakerRef>,
     seq: AtomicU64,
     checking: AtomicBool,
 }
@@ -138,7 +139,7 @@ impl RegistryMulti {
     #[inline(always)]
     pub fn new() -> Registry {
         Registry::Multi(Self {
-            queue: SegQueue::new(),
+            queue: LockedQueue::new(32),
             seq: AtomicU64::new(0),
             checking: AtomicBool::new(false),
         })
