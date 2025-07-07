@@ -1,5 +1,4 @@
-pub use super::recv_wakers::*;
-pub use super::send_wakers::*;
+pub use super::waker_registry::*;
 pub use crate::locked_waker::*;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -8,12 +7,12 @@ use std::task::Context;
 pub struct ChannelShared {
     tx_count: AtomicU64,
     rx_count: AtomicU64,
-    recvs: RecvWakers,
-    senders: SendWakers,
+    recvs: Registry,
+    senders: Registry,
 }
 
 impl ChannelShared {
-    pub fn new(senders: SendWakers, recvs: RecvWakers) -> Arc<Self> {
+    pub fn new(senders: Registry, recvs: Registry) -> Arc<Self> {
         Arc::new(Self { tx_count: AtomicU64::new(1), rx_count: AtomicU64::new(1), senders, recvs })
     }
 
@@ -55,47 +54,47 @@ impl ChannelShared {
 
     /// Register waker for current rx
     #[inline(always)]
-    pub fn reg_recv(&self, ctx: &mut Context) -> LockedWaker {
-        self.recvs.reg_recv(ctx)
+    pub fn reg_recv_async(&self, ctx: &mut Context) -> LockedWaker {
+        self.recvs.reg_async(ctx)
+    }
+
+    /// Register waker for current tx
+    #[inline(always)]
+    pub fn reg_send_async(&self, ctx: &mut Context) -> LockedWaker {
+        self.senders.reg_async(ctx)
     }
 
     /// Wake up one rx
     #[inline(always)]
     pub fn on_send(&self) {
-        self.recvs.on_send()
-    }
-
-    /// Register waker for current tx
-    #[inline(always)]
-    pub fn reg_send(&self, ctx: &mut Context) -> LockedWaker {
-        self.senders.reg_send(ctx)
+        self.recvs.fire()
     }
 
     /// Wake up one tx
     #[inline(always)]
     pub fn on_recv(&self) {
-        self.senders.on_recv()
+        self.senders.fire()
     }
 
     #[inline(always)]
     pub fn cancel_recv_waker(&self, waker: LockedWaker) {
-        self.recvs.cancel_recv_waker(waker);
+        self.recvs.cancel_waker(waker);
     }
 
     #[inline(always)]
     pub fn cancel_send_waker(&self, waker: LockedWaker) {
-        self.senders.cancel_send_waker(waker);
+        self.senders.cancel_waker(waker);
     }
 
     /// On timeout, clear dead wakers on sender queue
     pub fn clear_send_wakers(&self, seq: u64) {
-        self.senders.clear_send_wakers(seq);
+        self.senders.clear_wakers(seq);
     }
 
     /// On timeout, clear dead wakers on receiver queue
     #[inline(always)]
     pub fn clear_recv_wakers(&self, seq: u64) {
-        self.recvs.clear_recv_wakers(seq);
+        self.recvs.clear_wakers(seq);
     }
 
     /// Just for debugging purpose, to monitor queue size

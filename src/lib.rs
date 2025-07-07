@@ -149,10 +149,9 @@ mod locked_waker;
 pub mod mpmc;
 /// Multi producers, multi consumers
 pub mod mpsc;
-mod recv_wakers;
-mod send_wakers;
 /// Single producer, single consumer
 pub mod spsc;
+mod waker_registry;
 pub use locked_waker::LockedWaker;
 
 mod blocking_tx;

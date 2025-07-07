@@ -128,7 +128,7 @@ impl<T> AsyncRx<T> {
             }
             return r;
         }
-        let waker = self.shared.reg_recv(ctx);
+        let waker = self.shared.reg_recv_async(ctx);
         // NOTE: The other side put something whie reg_send and did not see the waker,
         // should check the channel again, otherwise might incur a dead lock.
         let r = self.try_recv();

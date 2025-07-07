@@ -91,7 +91,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
             }
             return r;
         }
-        let waker = self.shared.reg_send(ctx);
+        let waker = self.shared.reg_send_async(ctx);
         // NOTE: The other side put something whie reg_send and did not see the waker,
         // should check the channel again, otherwise might incur a dead lock.
         let r = self.try_send(item);

@@ -49,9 +49,14 @@ impl LockedWaker {
 
     // return is_already waked
     #[inline(always)]
+    pub(crate) fn cancel(&self) {
+        self.0.waked.store(true, Ordering::Release)
+    }
+
+    // return is_already waked
+    #[inline(always)]
     pub(crate) fn abandon(&self) -> bool {
-        let _self = self.0.as_ref();
-        _self.waked.swap(true, Ordering::SeqCst)
+        self.0.waked.swap(true, Ordering::SeqCst)
     }
 
     #[inline(always)]
@@ -104,6 +109,15 @@ impl LockedWakerRef {
             return _seq > seq;
         }
         return false;
+    }
+
+    #[inline(always)]
+    pub(crate) fn check_eq(&self, other: LockedWakerRef) -> bool {
+        if self.w.ptr_eq(&other.w) {
+            return true;
+        }
+        other.wake();
+        false
     }
 }
 
