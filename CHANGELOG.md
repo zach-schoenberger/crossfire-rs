@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.3] - 2025-07-07
+
+### Changed
+
+- Remove duplicated code.
+
+### Fixed
+
+- AsyncRx should not have Clone.
+
+- Protect against mis-use of spsc/mpsc when user should use mpmc (avoiding deadlocks)
+
 ## [2.0.2] - 2025-07-05
 
 ### Added
