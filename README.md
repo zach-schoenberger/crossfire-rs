@@ -56,17 +56,21 @@ More benchmark data is on [wiki](https://github.com/frostyplanet/crossfire-rs/wi
 
 There are 3 modules: [spsc], [mpsc], [mpmc], providing functions to allocate different types of channels.
 
-For SP or SC, it's more memory efficient than MP or MC implementations, and sometimes slightly faster.
+The SP or SC interface, only for non-concurrent operation, it's more memory efficient than MP or MC implementations, and sometimes slightly faster.
 
 The return types in these 3 modules are different:
 
-* [mpmc::bounded_async()]:  (tx async, rx async)
+* mpmc::bounded_blocking() : (tx blocking, rx blocking)
 
-* [mpmc::bounded_tx_async_rx_blocking()]
+* mpmc::bounded_async() :  (tx async, rx async)
 
-* [mpmc::bounded_tx_blocking_rx_async()]
+* mpmc::bounded_tx_async_rx_blocking() : (tx async, rx blocking)
 
-* [mpmc::unbounded_async()]
+* mpmc::bounded_tx_blocking_rx_async() : (tx blocking, rx async)
+
+* mpmc::unbounded_blocking() : (tx non-blocking, rx blocking)
+
+* mpmc::unbounded_async() : (tx non-blocking, rx async)
 
 
 > **NOTE** :  For bounded channel, 0 size case is not supported yet. (Temporary rewrite as 1 size).
@@ -96,9 +100,9 @@ The return types in these 3 modules are different:
 
 </table>
 
-
-> **NOTE**: For SP / SC version [AsyncTx] and [AsyncRx], although not designed to be not cloneable,
- send() recv() use immutable &self for convenient reason. Be careful do not use the SP/SC concurrently when put in Arc.
+> **NOTE**: For SP / SC version [AsyncTx], [AsyncRx], [Tx], [Rx], is not `Clone`, and without `Sync`,
+Although can be moved to other thread, but not allowed to use send/recv while in Arc. (Refer to the compile_fail
+examples in type document).
 
 ### Error types
 

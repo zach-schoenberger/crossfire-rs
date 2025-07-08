@@ -8,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Sender that works in blocking context
+/// Single producer (sender) that works in blocking context.
 ///
 /// **NOTE: Tx is not Clone, nor Sync.**
 /// If you need concurrent access, use [MTx](crate::MTx) instead.
@@ -25,9 +25,9 @@ use std::time::Duration;
 /// drop(rx);
 /// ```
 ///
-/// Because Tx does not have Sync marker, using `Arc<Tx>` will lost Send marker.
+/// Because Tx does not have Sync marker, using `Arc<Tx>` will lose Send marker.
 ///
-/// For your safety, the following code should not compile:
+/// For your safety, the following code **should not compile**:
 ///
 /// ``` compile_fail
 /// use crossfire::*;
@@ -133,7 +133,9 @@ impl<T> Tx<T> {
     }
 }
 
-/// Sender that works in blocking context. MP version of [`Tx<T>`] implements [Clone].
+/// Multi-producer (sender) that works in blocking context.
+///
+/// Inherits [`Tx<T>`] and implements [Clone].
 ///
 /// You can use `into()` to convert it to `Tx<T>`.
 pub struct MTx<T>(pub(crate) Tx<T>);

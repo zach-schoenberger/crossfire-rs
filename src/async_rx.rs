@@ -12,7 +12,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-/// Receiver that works in async context
+/// Single consumer (receiver) that works in async context.
 ///
 /// **NOTE: AsyncRx is not Clone, nor Sync.**
 /// If you need concurrent access, use [MAsyncRx](crate::MAsyncRx) instead.
@@ -31,9 +31,9 @@ use std::task::{Context, Poll};
 /// }
 /// ```
 ///
-/// Because AsyncRx does not have Sync marker, using `Arc<AsyncRx>` will lost Send marker.
+/// Because AsyncRx does not have Sync marker, using `Arc<AsyncRx>` will lose Send marker.
 ///
-/// For your safety, the following code should not compile:
+/// For your safety, the following code **should not compile**:
 ///
 /// ``` compile_fail
 /// use crossfire::*;
@@ -75,9 +75,6 @@ impl<T> AsyncRx<T> {
     }
 
     /// Receive message, will await when channel is empty.
-    ///
-    /// **NOTE: Do not call `AsyncRx::recv()` concurrently.**
-    /// If you need concurrent access, use [MAsyncRx](crate::MAsyncRx) instead.
     ///
     /// Returns `Ok(T)` when successful.
     ///
@@ -315,7 +312,9 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
     }
 }
 
-/// Receiver that works in async context. MC version of [`AsyncRx<T>`] implements [Clone].
+/// Multi-consumer (receiver) that works in async context.
+///
+/// Inherits [`AsyncRx<T>`] and implements [Clone].
 ///
 /// You can use `into()` to convert it to `AsyncRx<T>`.
 pub struct MAsyncRx<T>(pub(crate) AsyncRx<T>);

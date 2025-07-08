@@ -11,11 +11,10 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-/// Sender that works in async context
+/// Single producer (sender) that works in async context.
 ///
 /// **NOTE: AsyncTx is not Clone, nor Sync.**
 /// If you need concurrent access, use [MAsyncTx](crate::MAsyncTx) instead.
-///
 ///
 /// AsyncTx has Send marker, can be moved to other coroutine.
 /// The following code is OK :
@@ -31,9 +30,9 @@ use std::task::{Context, Poll};
 /// }
 /// ```
 ///
-/// Because AsyncTx does not have Sync marker, using `Arc<AsyncTx>` will lost Send marker.
+/// Because AsyncTx does not have Sync marker, using `Arc<AsyncTx>` will lose Send marker.
 ///
-/// For your safety, the following code should not compile:
+/// For your safety, the following code **should not compile**:
 ///
 /// ``` compile_fail
 /// use crossfire::*;
@@ -70,9 +69,6 @@ impl<T> Drop for AsyncTx<T> {
 
 impl<T: Unpin + Send + 'static> AsyncTx<T> {
     /// Send message. Will await when channel is full.
-    ///
-    /// **NOTE: Do not call `AsyncTx::send()` concurrently.**
-    /// If you need concurrent access, use [MAsyncTx::send()](crate::MAsyncTx) instead.
     ///
     /// Returns `Ok(())` on successful.
     ///
@@ -310,7 +306,9 @@ impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for AsyncTx<T> {
     }
 }
 
-/// Sender that works in async context, MP version of [`AsyncTx<T>`] implements [Clone].
+/// Multi-producer (sender) that works in async context.
+///
+/// Inherits [`AsyncTx<T>`] and implements [Clone].
 ///
 /// You can use `into()` to convert it to `AsyncTx<T>`.
 pub struct MAsyncTx<T>(pub(crate) AsyncTx<T>);

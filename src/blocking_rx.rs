@@ -8,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Receiver that works in blocking context
+/// Single consumer (receiver) that works in blocking context.
 ///
 /// **NOTE: Rx is not Clone, nor Sync.**
 /// If you need concurrent access, use [MRx](crate::MRx) instead.
@@ -25,9 +25,9 @@ use std::time::Duration;
 /// drop(tx);
 /// ```
 ///
-/// Because Rx does not have Sync marker, using `Arc<Rx>` will lost Send marker.
+/// Because Rx does not have Sync marker, using `Arc<Rx>` will lose Send marker.
 ///
-/// For your safety, the following code should not compile:
+/// For your safety, the following code **should not compile**:
 ///
 /// ``` compile_fail
 /// use crossfire::*;
@@ -132,7 +132,9 @@ impl<T> Rx<T> {
     }
 }
 
-/// Receiver that works in blocking context. MC version of [`Rx<T>`] implements [Clone].
+/// Multi-consumer (receiver) that works in blocking context.
+///
+/// Inherits [`Rx<T>`] and implements [Clone].
 ///
 /// You can use `into()` to convert it to `Rx<T>`.
 pub struct MRx<T>(pub(crate) Rx<T>);

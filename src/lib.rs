@@ -40,18 +40,21 @@
 //!
 //! There are 3 modules: [spsc], [mpsc], [mpmc], providing functions to allocate different types of channels.
 //!
-//! For SP or SC, it's more memory efficient than MP or MC implementations, and sometimes slightly faster.
+//! The SP or SC interface, only for non-concurrent operation, it's more memory efficient than MP or MC implementations, and sometimes slightly faster.
 //!
 //! The return types in these 3 modules are different:
 //!
-//! * [mpmc::bounded_async()]:  (tx async, rx async)
+//! * [mpmc::bounded_blocking()]: tx blocking, rx blocking
 //!
-//! * [mpmc::bounded_tx_async_rx_blocking()]
+//! * [mpmc::bounded_async()]:  tx async, rx async
 //!
-//! * [mpmc::bounded_tx_blocking_rx_async()]
+//! * [mpmc::bounded_tx_async_rx_blocking()]: tx async, rx blocking
 //!
-//! * [mpmc::unbounded_async()]
+//! * [mpmc::bounded_tx_blocking_rx_async()]: tx blocking, rx async
 //!
+//! * [mpmc::unbounded_blocking()]: tx non-blocking, rx blocking
+//!
+//! * [mpmc::unbounded_async()]: tx non-blocking, rx async
 //!
 //! > **NOTE** :  For bounded channel, 0 size case is not supported yet. (Temporary rewrite as 1 size).
 //!
@@ -78,12 +81,13 @@
 //!
 //! </table>
 //!
-//! > **NOTE**: For SP / SC version [AsyncTx] and [AsyncRx], although not designed to be not cloneable,
-//! send() recv() use immutable &self for convenient reason. Be careful do not use the SP / SC concurrently when put in Arc.
+//! > **NOTE**: For SP / SC version [AsyncTx], [AsyncRx], [Tx], [Rx], is not `Clone`, and without `Sync`,
+//! Although can be moved to other thread, but not allowed to use send/recv while in Arc. (Refer to the compile_fail
+//! examples in type document).
 //!
 //! ### Error types
 //!
-//! Error types are re-exported from crossbeam-channel:  [TrySendError], [SendError], [TryRecvError], [RecvError]
+//! Error types are re-exported from crossbeam-channel:  [TrySendError], [SendError], [TryRecvError], [RecvError],
 //!
 //! ### Async compatibility
 //!
@@ -116,26 +120,39 @@
 //! use crossfire::*;
 //! #[macro_use]
 //! extern crate tokio;
+//! use tokio::time::{sleep, interval, Duration};
 //!
 //! #[tokio::main]
 //! async fn main() {
 //!     let (tx, rx) = mpsc::bounded_async::<i32>(100);
-//!     tokio::spawn(async move {
-//!        for i in 0i32..10000 {
-//!            let _ = tx.send(i).await;
-//!            println!("sent {}", i);
-//!        }
-//!     });
+//!     for _ in 0..10 {
+//!         let _tx = tx.clone();
+//!         tokio::spawn(async move {
+//!             for i in 0i32..10 {
+//!                 let _ = _tx.send(i).await;
+//!                 sleep(Duration::from_millis(100)).await;
+//!                 println!("sent {}", i);
+//!             }
+//!         });
+//!     }
+//!     drop(tx);
+//!     let mut inv = tokio::time::interval(Duration::from_millis(500));
 //!     loop {
-//!         if let Ok(_i) = rx.recv().await {
-//!             println!("recv {}", _i);
-//!         } else {
-//!             println!("rx closed");
-//!             break;
+//!         tokio::select! {
+//!             _ = inv.tick() =>{
+//!                 println!("tick");
+//!             }
+//!             r = rx.recv() => {
+//!                 if let Ok(_i) = r {
+//!                     println!("recv {}", _i);
+//!                 } else {
+//!                     println!("rx closed");
+//!                     break;
+//!                 }
+//!             }
 //!         }
 //!     }
 //! }
-//!
 //! ```
 
 extern crate crossbeam;
@@ -147,11 +164,8 @@ mod channel;
 mod locked_waker;
 pub use locked_waker::LockedWaker;
 mod collections;
-/// Multi producers, single consumer
 pub mod mpmc;
-/// Multi producers, multi consumers
 pub mod mpsc;
-/// Single producer, single consumer
 pub mod spsc;
 mod waker_registry;
 

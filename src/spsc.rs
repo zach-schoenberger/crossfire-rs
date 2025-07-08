@@ -1,8 +1,44 @@
+//! Single producer, single consumer.
+//!
+//! The optimization assumes single producer and consumer condition.
+//!
+//! **NOTE**: For SP / SC version [AsyncTx], [AsyncRx], [Tx], [Rx], is not `Clone`, and without `Sync`,
+//! Although can be moved to other thread, but not allowed to use send/recv while in Arc.
+//!
+//! The following code is OK :
+//!
+//! ``` rust
+//! use crossfire::*;
+//! async fn foo() {
+//!     let (tx, rx) = spsc::bounded_async::<usize>(100);
+//!     tokio::spawn(async move {
+//!          let _ = tx.send(2).await;
+//!     });
+//!     drop(rx);
+//! }
+//! ```
+//!
+//! Because AsyncTx does not have Sync marker, using `Arc<AsyncTx>` will lose Send marker.
+//!
+//! For your safety, the following code **should not compile**:
+//!
+//! ``` compile_fail
+//! use crossfire::*;
+//! use std::sync::Arc;
+//! async fn foo() {
+//!     let (tx, rx) = spsc::bounded_async::<usize>(100);
+//!     let tx = Arc::new(tx);
+//!     tokio::spawn(async move {
+//!          let _ = tx.send(2).await;
+//!     });
+//!     drop(rx);
+//! }
+//! ```
+
 use crate::async_rx::*;
 use crate::async_tx::*;
 use crate::blocking_rx::*;
 use crate::blocking_tx::*;
-/// Single producer, single consumer
 use crate::channel::*;
 
 /// Initiate an unbounded channel for blocking context.
