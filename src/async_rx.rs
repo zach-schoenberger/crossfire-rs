@@ -144,11 +144,14 @@ impl<T> AsyncRx<T> {
                     let _ = o_waker.take(); // should reg again
                 } else {
                     if self.shared.get_tx_count() == 0 {
-                        // Check channel close before sleep
-                        return Err(TryRecvError::Disconnected);
+                        if self.recv.is_empty() {
+                            // Check channel close before sleep
+                            return Err(TryRecvError::Disconnected);
+                        }
+                    } else {
+                        // False wake up, sleep again
+                        return Err(TryRecvError::Empty);
                     }
-                    // False wake up, sleep again
-                    return Err(TryRecvError::Empty);
                 }
             }
         } else {
@@ -162,9 +165,13 @@ impl<T> AsyncRx<T> {
         // should check the channel again, otherwise might incur a dead lock.
         let r = self.try_recv();
         if let Err(TryRecvError::Empty) = &r {
+            // Check channel close before sleep, otherwise might block forever
+            // Confirmed by test_pressure_1_tx_blocking_1_rx_async()
             if self.shared.get_tx_count() == 0 {
-                // Check channel close before sleep, otherwise might block forever
-                // Confirmed by test_pressure_1_tx_blocking_1_rx_async()
+                // Ensure all message is received.
+                if let Ok(msg) = self.try_recv() {
+                    return Ok(msg);
+                }
                 return Err(TryRecvError::Disconnected);
             }
             o_waker.replace(waker);
