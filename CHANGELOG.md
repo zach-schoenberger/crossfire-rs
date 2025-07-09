@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AsyncRx: Fix rare case that message left on disconnect
 
-- Fixed document typo and improve discription.
+- Fixed document typo and improve description.
 
 ### Changed
 
