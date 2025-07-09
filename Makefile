@@ -1,18 +1,18 @@
 RUNTESTCASE = _run_test_case() {                                                  \
     case="$(filter-out $@,$(MAKECMDGOALS))";                                      \
     if [ -n "$${case}" ]; then                                                    \
-        RUST_BACKTRACE=full cargo test $${case} -F=tokio -- --nocapture --test-threads=1;  \
+        RUST_BACKTRACE=full cargo test $${case} $${FEATURE_FLAG} -- --nocapture --test-threads=1;  \
     else                                                                          \
-        RUST_BACKTRACE=full cargo test -F=tokio -- --nocapture --test-threads=1;           \
+        RUST_BACKTRACE=full cargo test $${FEATURE_FLAG} -- --nocapture --test-threads=1;           \
     fi  \
 }
 
 RUNRELEASECASE = _run_test_release_case() {                                                  \
     case="$(filter-out $@,$(MAKECMDGOALS))";                                      \
     if [ -n "$${case}" ]; then                                                    \
-        RUST_BACKTRACE=full cargo test $${case} -F=tokio --release -- --nocapture --test-threads=1;  \
+        RUST_BACKTRACE=full cargo test $${case} $${FEATURE_FLAG} --release -- --nocapture --test-threads=1;  \
     else                                                                          \
-        RUST_BACKTRACE=full cargo test --release -F=tokio -- --nocapture --test-threads=1;                                            \
+        RUST_BACKTRACE=full cargo test --release $${FEATURE_FLAG} -- --nocapture --test-threads=1;                                            \
     fi  \
 }
 
@@ -39,12 +39,22 @@ doc:
 .PHONY: test
 test: init
 	@echo "Run test"
-	@${RUNTESTCASE}; _run_test_case
+	@${RUNTESTCASE}; FEATURE_FLAG="-F tokio"; _run_test_case
+	@echo "Done"
+
+.PHONY: test
+test_async_std: init
+	@echo "Run test"
+	@${RUNTESTCASE}; FEATURE_FLAG="-F async_std"; _run_test_case
 	@echo "Done"
 
 .PHONY: test_release
 test_release:
-	@${RUNRELEASECASE}; _run_test_release_case
+	@${RUNRELEASECASE}; FEATURE_FLAG="-F tokio"; _run_test_release_case
+
+.PHONY: test_async_std_release
+test_async_std_release:
+	@${RUNRELEASECASE}; FEATURE_FLAG="-F async_std"; _run_test_release_case
 
 .PHONY: build
 build: init

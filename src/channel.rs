@@ -1,5 +1,7 @@
 pub use super::waker_registry::*;
 pub use crate::locked_waker::*;
+pub use crossbeam::channel::{RecvError, RecvTimeoutError, TryRecvError};
+pub use crossbeam::channel::{SendError, SendTimeoutError, TrySendError};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::Context;

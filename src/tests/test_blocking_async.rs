@@ -13,8 +13,7 @@ use std::time::*;
 #[case(spsc::bounded_tx_blocking_rx_async::<usize>(10))]
 #[case(mpsc::bounded_tx_blocking_rx_async::<usize>(10))]
 #[case(mpmc::bounded_tx_blocking_rx_async::<usize>(10))]
-#[tokio::test]
-async fn test_basic_1_tx_blocking_1_rx_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize>>(
+fn test_basic_1_tx_blocking_1_rx_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     let _ = setup_log; // Disable unused var warning
@@ -35,20 +34,22 @@ async fn test_basic_1_tx_blocking_1_rx_async<T: BlockingTxTrait<usize>, R: Async
         std::thread::sleep(Duration::from_secs(1));
         assert!(tx.send(11).is_ok());
     });
-    for i in 0usize..12 {
-        match rx.recv().await {
-            Ok(j) => {
-                debug!("recv {}", i);
-                assert_eq!(i, j);
-            }
-            Err(e) => {
-                panic!("error {}", e);
+    runtime_block_on!(async move {
+        for i in 0usize..12 {
+            match rx.recv().await {
+                Ok(j) => {
+                    debug!("recv {}", i);
+                    assert_eq!(i, j);
+                }
+                Err(e) => {
+                    panic!("error {}", e);
+                }
             }
         }
-    }
-    let res = rx.recv().await;
-    assert!(res.is_err());
-    debug!("rx close");
+        let res = rx.recv().await;
+        assert!(res.is_err());
+        debug!("rx close");
+    });
     let _ = th.join();
 }
 
@@ -56,11 +57,7 @@ async fn test_basic_1_tx_blocking_1_rx_async<T: BlockingTxTrait<usize>, R: Async
 #[case(spsc::bounded_tx_blocking_rx_async::<usize>(10))]
 #[case(mpsc::bounded_tx_blocking_rx_async::<usize>(10))]
 #[case(mpmc::bounded_tx_blocking_rx_async::<usize>(10))]
-#[tokio::test]
-async fn test_timeout_1_tx_blocking_1_rx_async<
-    T: BlockingTxTrait<usize>,
-    R: AsyncRxTrait<usize>,
->(
+fn test_timeout_1_tx_blocking_1_rx_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     let _ = setup_log; // Disable unused var warning
@@ -81,22 +78,24 @@ async fn test_timeout_1_tx_blocking_1_rx_async<
         assert!(tx.send_timeout(10, Duration::from_millis(200)).is_ok());
     });
 
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    runtime_block_on!(async move {
+        sleep(Duration::from_millis(200)).await;
 
-    for i in 0usize..11 {
-        match rx.recv().await {
-            Ok(j) => {
-                debug!("recv {}", i);
-                assert_eq!(i, j);
-            }
-            Err(e) => {
-                panic!("error {}", e);
+        for i in 0usize..11 {
+            match rx.recv().await {
+                Ok(j) => {
+                    debug!("recv {}", i);
+                    assert_eq!(i, j);
+                }
+                Err(e) => {
+                    panic!("error {}", e);
+                }
             }
         }
-    }
-    let res = rx.recv().await;
-    assert!(res.is_err());
-    debug!("rx close");
+        let res = rx.recv().await;
+        assert!(res.is_err());
+        debug!("rx close");
+    });
     let _ = th.join();
 }
 
@@ -110,11 +109,7 @@ async fn test_timeout_1_tx_blocking_1_rx_async<
 #[case(spsc::unbounded_async::<usize>())]
 #[case(mpsc::unbounded_async::<usize>())]
 #[case(mpmc::unbounded_async::<usize>())]
-#[tokio::test]
-async fn test_pressure_1_tx_blocking_1_rx_async<
-    T: BlockingTxTrait<usize>,
-    R: AsyncRxTrait<usize>,
->(
+fn test_pressure_1_tx_blocking_1_rx_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     let _ = setup_log; // Disable unused var warning
@@ -125,18 +120,20 @@ async fn test_pressure_1_tx_blocking_1_rx_async<
             tx.send(i).expect("send ok");
         }
     });
-    for i in 0..round {
-        match rx.recv().await {
-            Ok(msg) => {
-                //debug!("recv {}", msg);
-                assert_eq!(msg, i);
-            }
-            Err(_e) => {
-                panic!("channel closed");
+    runtime_block_on!(async move {
+        for i in 0..round {
+            match rx.recv().await {
+                Ok(msg) => {
+                    //debug!("recv {}", msg);
+                    assert_eq!(msg, i);
+                }
+                Err(_e) => {
+                    panic!("channel closed");
+                }
             }
         }
-    }
-    assert!(rx.recv().await.is_err());
+        assert!(rx.recv().await.is_err());
+    });
     let _ = th.join();
 }
 
@@ -159,8 +156,7 @@ async fn test_pressure_1_tx_blocking_1_rx_async<
 #[case(mpmc::unbounded_async::<usize>(), 10)]
 #[case(mpmc::unbounded_async::<usize>(), 100)]
 #[case(mpmc::unbounded_async::<usize>(), 1000)]
-#[tokio::test]
-async fn test_pressure_tx_multi_blocking_1_rx_async<R: AsyncRxTrait<usize>>(
+fn test_pressure_tx_multi_blocking_1_rx_async<R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (MTx<usize>, R), #[case] tx_count: usize,
 ) {
     let _ = setup_log; // Disable unused var warning
@@ -191,16 +187,18 @@ async fn test_pressure_tx_multi_blocking_1_rx_async<R: AsyncRxTrait<usize>>(
     }
     drop(tx);
     let _counter = counter.clone();
-    'A: loop {
-        match rx.recv().await {
-            Ok(_i) => {
-                _counter.as_ref().fetch_add(1, Ordering::SeqCst);
-                //debug!("rx {} {}\r", _rx_i, _i);
+    runtime_block_on!(async move {
+        'A: loop {
+            match rx.recv().await {
+                Ok(_i) => {
+                    _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                    //debug!("rx {} {}\r", _rx_i, _i);
+                }
+                Err(_) => break 'A,
             }
-            Err(_) => break 'A,
         }
-    }
-    assert_eq!(counter.as_ref().load(Ordering::Acquire), round);
+        assert_eq!(counter.as_ref().load(Ordering::Acquire), round);
+    });
     for th in tx_th_s {
         let _ = th.join();
     }
@@ -224,8 +222,7 @@ async fn test_pressure_tx_multi_blocking_1_rx_async<R: AsyncRxTrait<usize>>(
 #[case(mpmc::unbounded_async::<usize>(), 100, 200)]
 #[case(mpmc::unbounded_async::<usize>(), 300, 500)]
 #[case(mpmc::unbounded_async::<usize>(), 30, 1000)]
-#[tokio::test]
-async fn test_pressure_tx_multi_blocking_multi_rx_async(
+fn test_pressure_tx_multi_blocking_multi_rx_async(
     setup_log: (), #[case] channel: (MTx<usize>, MAsyncRx<usize>), #[case] tx_count: usize,
     #[case] rx_count: usize,
 ) {
@@ -257,35 +254,36 @@ async fn test_pressure_tx_multi_blocking_multi_rx_async(
         }));
     }
     drop(tx);
-    let (noti_tx, mut noti_rx) = tokio::sync::mpsc::channel::<usize>(rx_count);
-    for _rx_i in 0..rx_count {
-        let _rx = rx.clone();
-        let mut _noti_tx = noti_tx.clone();
-        let _counter = counter.clone();
-        tokio::spawn(async move {
-            'A: loop {
-                match _rx.recv().await {
-                    Ok(_i) => {
-                        _counter.as_ref().fetch_add(1, Ordering::SeqCst);
-                        //debug!("rx {} {}\r", _rx_i, _i);
+    runtime_block_on!(async move {
+        let (noti_tx, noti_rx) = mpmc::unbounded_async();
+        for _rx_i in 0..rx_count {
+            let _rx = rx.clone();
+            let mut _noti_tx = noti_tx.clone();
+            let _counter = counter.clone();
+            async_spawn!(async move {
+                'A: loop {
+                    match _rx.recv().await {
+                        Ok(_i) => {
+                            _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                            //debug!("rx {} {}\r", _rx_i, _i);
+                        }
+                        Err(_) => break 'A,
                     }
-                    Err(_) => break 'A,
                 }
-            }
-            debug!("rx {} exiting", _rx_i);
-            let _ = _noti_tx.send(_rx_i).await;
-            debug!("rx {} exit", _rx_i);
-        });
-    }
-    drop(rx);
-    drop(noti_tx);
-    for _ in 0..(rx_count) {
-        match noti_rx.recv().await {
-            Some(_) => {}
-            None => break,
+                debug!("rx {} exiting", _rx_i);
+                let _ = _noti_tx.send(_rx_i);
+                debug!("rx {} exit", _rx_i);
+            });
         }
-    }
-    assert_eq!(counter.as_ref().load(Ordering::Acquire), round);
+        drop(rx);
+        drop(noti_tx);
+        for _ in 0..(rx_count) {
+            if let Err(_) = noti_rx.recv().await {
+                break;
+            }
+        }
+        assert_eq!(counter.as_ref().load(Ordering::Acquire), round);
+    });
     for th in tx_th_s {
         let _ = th.join();
     }

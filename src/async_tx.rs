@@ -376,8 +376,8 @@ pub trait AsyncTxTrait<T: Unpin + Send + 'static>: Send + 'static {
     /// Returns Err([SendTimeoutError::Timeout]) when the operation timed out.
     ///
     /// Returns Err([SendTimeoutError::Disconnected]) when all Rx dropped.
-    #[cfg(feature = "tokio")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+    #[cfg(any(feature = "tokio", feature = "async_std"))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     fn send_timeout<'a>(
         &'a self, item: T, duration: std::time::Duration,
     ) -> SendTimeoutFuture<'a, T>;
@@ -411,8 +411,8 @@ impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for AsyncTx<T> {
         AsyncTx::send(self, item)
     }
 
-    #[cfg(feature = "tokio")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+    #[cfg(any(feature = "tokio", feature = "async_std"))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     #[inline(always)]
     fn send_timeout<'a>(
         &'a self, item: T, duration: std::time::Duration,
@@ -486,8 +486,8 @@ impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for MAsyncTx<T> {
         self.0.send(item)
     }
 
-    #[cfg(feature = "tokio")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+    #[cfg(any(feature = "tokio", feature = "async_std"))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     #[inline(always)]
     fn send_timeout<'a>(
         &'a self, item: T, duration: std::time::Duration,

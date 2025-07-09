@@ -175,6 +175,9 @@ extern crate futures;
 #[macro_use]
 extern crate enum_dispatch;
 
+pub use crossbeam::channel::{RecvError, RecvTimeoutError, TryRecvError};
+pub use crossbeam::channel::{SendError, SendTimeoutError, TrySendError};
+
 mod channel;
 mod locked_waker;
 pub use locked_waker::LockedWaker;

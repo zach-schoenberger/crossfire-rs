@@ -1,6 +1,5 @@
 use crate::channel::*;
 use crossbeam::channel::Sender;
-pub use crossbeam::channel::{SendError, SendTimeoutError, TrySendError};
 use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;

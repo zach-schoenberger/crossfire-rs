@@ -361,8 +361,8 @@ pub trait AsyncRxTrait<T: Unpin + Send + 'static>: Send + 'static {
     /// Returns Err([RecvTimeoutError::Timeout]) when a message could not be received because the channel is empty and the operation timed out.
     ///
     /// returns Err([RecvTimeoutError::Disconnected]) when all Tx dropped and channel is empty.
-    #[cfg(feature = "tokio")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+    #[cfg(any(feature = "tokio", feature = "async_std"))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     fn recv_timeout<'a>(&'a self, timeout: std::time::Duration) -> ReceiveTimeoutFuture<'a, T>;
 
     /// Try to receive message, non-blocking.
@@ -392,8 +392,8 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
         AsyncRx::recv(self)
     }
 
-    #[cfg(feature = "tokio")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+    #[cfg(any(feature = "tokio", feature = "async_std"))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     #[inline(always)]
     fn recv_timeout<'a>(&'a self, duration: std::time::Duration) -> ReceiveTimeoutFuture<'a, T> {
         AsyncRx::recv_timeout(self, duration)
@@ -488,8 +488,8 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for MAsyncRx<T> {
         self.0.recv()
     }
 
-    #[cfg(feature = "tokio")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+    #[cfg(any(feature = "tokio", feature = "async_std"))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     #[inline(always)]
     fn recv_timeout<'a>(&'a self, duration: std::time::Duration) -> ReceiveTimeoutFuture<'a, T> {
         self.0.recv_timeout(duration)

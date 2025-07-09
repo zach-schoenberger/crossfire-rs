@@ -1,6 +1,5 @@
 use crate::channel::*;
 use crossbeam::channel::Receiver;
-pub use crossbeam::channel::{RecvError, RecvTimeoutError, TryRecvError};
 use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
