@@ -128,8 +128,9 @@ impl<T> AsyncRx<T> {
         }
     }
 
-    /// Generate a fixed Sized future object that receive a message
+    /// Use recv() instead.
     #[inline(always)]
+    #[deprecated]
     pub fn make_recv_future<'a>(&'a self) -> ReceiveFuture<'a, T> {
         return ReceiveFuture { rx: &self, waker: None };
     }

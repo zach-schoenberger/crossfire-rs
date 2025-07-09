@@ -80,8 +80,9 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
         return SendFuture { tx: &self, item: Some(item), waker: None };
     }
 
-    /// Generate a fixed Sized future object that send a message
+    /// Use send() instead
     #[inline(always)]
+    #[deprecated]
     pub fn make_send_future<'a>(&'a self, item: T) -> SendFuture<'a, T> {
         return SendFuture { tx: &self, item: Some(item), waker: None };
     }
