@@ -15,6 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.5] - 2025-07-09
+
+### Added
+
+- Add send_timeout() & recv_timeout() for async context
+
+### Fixed
+
+- AsyncRx: Fix rare case that message left on disconnect
+
+- Fixed document typo and improve discription.
+
+### Changed
+
+- Optimise RegistryMulti, with 20%+ speed improved on MPSC / MPMC
 
 ## [2.0.4] - 2025-07-08
 
