@@ -110,15 +110,13 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
         };
     }
 
-    /// This is only useful when you're writing your own future.
-    ///
     /// Returns `Ok(())` on message sent.
     ///
     /// Returns Err([TrySendError::Full]) for Poll::Pending case.
     ///
     /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
     #[inline(always)]
-    pub fn poll_send<'a>(
+    pub(crate) fn poll_send<'a>(
         &'a self, ctx: &'a mut Context, mut item: T, o_waker: &'a mut Option<LockedWaker>,
     ) -> Result<(), TrySendError<T>> {
         // When the result is not TrySendError::Full,

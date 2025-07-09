@@ -146,15 +146,13 @@ impl<T> AsyncRx<T> {
         self.recv.is_empty()
     }
 
-    /// This is only useful when you're writing your own future.
-    ///
     /// Returns `Ok(T)` on successful.
     ///
     /// Return Err([TryRecvError::Empty]) for Poll::Pending case.
     ///
     /// Return Err([TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
     #[inline(always)]
-    pub fn poll_item(
+    pub(crate) fn poll_item(
         &self, ctx: &mut Context, o_waker: &mut Option<LockedWaker>,
     ) -> Result<T, TryRecvError> {
         // When the result is not TryRecvError::Empty,
