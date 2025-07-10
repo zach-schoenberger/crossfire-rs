@@ -110,15 +110,18 @@ Error types are re-exported from crossbeam-channel:  [TrySendError], [SendError]
 
 ### Feature flags
 
-- `tokio`: Enable send_timeout, recv_timeout API for async context, implement base on tokio
+- `tokio`: Enable send_timeout, recv_timeout API for async context, based on `tokio`.
 
+- `async_std`: Enable send_timeout, recv_timeout API for async context, base on `async-std`.
 
 ### Async compatibility
 
-Mainly tested on tokio-1.x. But default we do not depend on any async runtime.
+Tested on tokio-1.x and async-std-1.x, by default we do not depend on any async runtime.
 
 In async context, tokio-select! or future-select! can be used.  Cancelling is supported. You can combine
-recv() future with tokio::time::timeout. When feature "tokio" enable, we also provide
+recv() future with tokio::time::timeout.
+
+When feature "tokio" or "async_std" enable, we also provide
 [send_timeout](crate::AsyncTx::send_timeout()) and
 [recv_timeout](crate::AsyncRx::recv_timeout())
 

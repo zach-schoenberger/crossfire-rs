@@ -97,17 +97,23 @@ impl<T> AsyncRx<T> {
     /// Returns Err([RecvTimeoutError::Timeout]) when a message could not be received because the channel is empty and the operation timed out.
     ///
     /// returns Err([RecvTimeoutError::Disconnected]) when all Tx dropped and channel is empty.
-    #[cfg(feature = "tokio")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+    #[cfg(any(feature = "tokio", feature = "async_std"))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     #[inline]
     pub fn recv_timeout<'a>(
         &'a self, duration: std::time::Duration,
     ) -> ReceiveTimeoutFuture<'a, T> {
-        return ReceiveTimeoutFuture {
-            rx: &self,
-            waker: None,
-            sleep: Box::pin(tokio::time::sleep(duration)),
+        let sleep = {
+            #[cfg(feature = "tokio")]
+            {
+                Box::pin(tokio::time::sleep(duration))
+            }
+            #[cfg(not(feature = "tokio"))]
+            {
+                Box::pin(async_std::task::sleep(duration))
+            }
         };
+        return ReceiveTimeoutFuture { rx: &self, waker: None, sleep };
     }
 
     /// Try to receive message, non-blocking.
@@ -279,18 +285,23 @@ impl<T> Future for ReceiveFuture<'_, T> {
 }
 
 /// A fixed-sized future object constructed by [AsyncRx::recv_timeout()]
-#[cfg(feature = "tokio")]
-#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+#[cfg(any(feature = "tokio", feature = "async_std"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
 pub struct ReceiveTimeoutFuture<'a, T> {
     rx: &'a AsyncRx<T>,
     waker: Option<LockedWaker>,
+    #[cfg(feature = "tokio")]
     sleep: Pin<Box<tokio::time::Sleep>>,
+    #[cfg(not(feature = "tokio"))]
+    sleep: Pin<Box<dyn Future<Output = ()>>>,
 }
 
-#[cfg(feature = "tokio")]
+#[cfg(any(feature = "tokio", feature = "async_std"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
 unsafe impl<T: Unpin + Send> Send for ReceiveTimeoutFuture<'_, T> {}
 
-#[cfg(feature = "tokio")]
+#[cfg(any(feature = "tokio", feature = "async_std"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
 impl<T> Drop for ReceiveTimeoutFuture<'_, T> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
@@ -305,8 +316,8 @@ impl<T> Drop for ReceiveTimeoutFuture<'_, T> {
     }
 }
 
-#[cfg(feature = "tokio")]
-#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+#[cfg(any(feature = "tokio", feature = "async_std"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
 impl<T> Future for ReceiveTimeoutFuture<'_, T> {
     type Output = Result<T, RecvTimeoutError>;
 
