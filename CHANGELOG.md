@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.6] - 2025-07-10
+
+### Added
+
+- Support timeout and tested on async-std
+
+### Changed
+
+- mark make_recv_future() & make_send_future() deprecated.
+
+- Change poll_send() & poll_item() to private function.
+
 ## [2.0.5] - 2025-07-09
 
 ### Added
