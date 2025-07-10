@@ -1,5 +1,4 @@
 use crate::channel::*;
-use async_trait::async_trait;
 #[cfg(feature = "tokio")]
 pub use crossbeam::channel::SendTimeoutError;
 use crossbeam::channel::Sender;
@@ -338,7 +337,6 @@ impl<T: Unpin + Send + 'static> Future for SendTimeoutFuture<'_, T> {
 }
 
 /// For writing generic code with MAsyncTx & AsyncTx
-#[async_trait]
 pub trait AsyncTxTrait<T: Unpin + Send + 'static>: Send + 'static {
     /// Just for debugging purpose, to monitor queue size
     #[cfg(test)]
@@ -383,7 +381,6 @@ pub trait AsyncTxTrait<T: Unpin + Send + 'static>: Send + 'static {
     ) -> SendTimeoutFuture<'a, T>;
 }
 
-#[async_trait]
 impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for AsyncTx<T> {
     #[inline(always)]
     #[cfg(test)]
@@ -462,7 +459,6 @@ impl<T> DerefMut for MAsyncTx<T> {
     }
 }
 
-#[async_trait]
 impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for MAsyncTx<T> {
     #[inline(always)]
     fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
