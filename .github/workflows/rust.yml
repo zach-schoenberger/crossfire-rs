@@ -42,7 +42,7 @@ jobs:
       if: ${{ failure() }}
       uses: actions/upload-artifact@v4
       with:
-        name: test log
+        name: test log release
         path: /tmp/test_crossfire.log
 
     - name: Run tests with async_std
@@ -52,7 +52,7 @@ jobs:
       if: ${{ failure() }}
       uses: actions/upload-artifact@v4
       with:
-        name: test log
+        name: test log async_std
         path: /tmp/test_crossfire.log
 
     - name: Run tests with async_std --releaes
@@ -62,5 +62,5 @@ jobs:
       if: ${{ failure() }}
       uses: actions/upload-artifact@v4
       with:
-        name: test log
+        name: test log async_std release
         path: /tmp/test_crossfire.log
