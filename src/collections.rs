@@ -79,9 +79,11 @@ impl<T> LockedQueue<T> {
         }
         let mut guard = self.queue.lock();
         if let Some(item) = guard.pop_front() {
+            if guard.len() == 0 {
+                self.empty.store(true, Ordering::Release);
+            }
             Some(item)
         } else {
-            self.empty.store(true, Ordering::Release);
             None
         }
     }
@@ -90,6 +92,12 @@ impl<T> LockedQueue<T> {
     pub fn len(&self) -> usize {
         let guard = self.queue.lock();
         guard.len()
+    }
+
+    #[allow(dead_code)]
+    #[inline(always)]
+    pub fn exists(&self) -> bool {
+        !self.empty.load(Ordering::Acquire)
     }
 }
 
@@ -116,5 +124,29 @@ mod tests {
         drop(_item);
         assert_eq!(Arc::strong_count(&item), 1);
         assert_eq!(Arc::weak_count(&item), 0);
+    }
+
+    #[test]
+    fn test_locked_queue() {
+        let queue = LockedQueue::new(2);
+        assert_eq!(queue.len(), 0);
+        assert!(!queue.exists());
+        queue.push(1);
+        assert_eq!(queue.len(), 1);
+        assert!(queue.exists());
+        queue.push(2);
+        assert_eq!(queue.len(), 2);
+        // exceeding len
+        queue.push(3);
+        assert_eq!(queue.len(), 3);
+        assert!(queue.exists());
+        assert_eq!(queue.pop().unwrap(), 1);
+        assert_eq!(queue.len(), 2);
+        assert_eq!(queue.pop().unwrap(), 2);
+        assert_eq!(queue.len(), 1);
+        assert!(queue.exists());
+        assert_eq!(queue.pop().unwrap(), 3);
+        assert_eq!(queue.len(), 0);
+        assert!(!queue.exists());
     }
 }
