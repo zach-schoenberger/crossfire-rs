@@ -24,6 +24,31 @@ where
     pub fn new(rx: AsyncRx<T>) -> Self {
         Self { rx, waker: None, phan: Default::default(), ended: false }
     }
+
+    /// poll_item() will try to receive message, if not successful, will register notification for
+    /// the next poll.
+    ///
+    /// Returns `Ok(T)` on successful.
+    ///
+    /// Return Err([TryRecvError::Empty]) for Poll::Pending case.
+    ///
+    /// Return Err([TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
+    #[inline]
+    pub fn poll_item(&mut self, ctx: &mut Context) -> Poll<Option<T>> {
+        if self.ended {
+            return Poll::Ready(None);
+        }
+        match self.rx.poll_item(ctx, &mut self.waker) {
+            Ok(item) => Poll::Ready(Some(item)),
+            Err(e) => {
+                if e.is_empty() {
+                    return Poll::Pending;
+                }
+                self.ended = true;
+                return Poll::Ready(None);
+            }
+        }
+    }
 }
 
 impl<T> stream::Stream for AsyncStream<T>
@@ -32,6 +57,7 @@ where
 {
     type Item = T;
 
+    #[inline]
     fn poll_next(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Option<Self::Item>> {
         let mut _self = self.get_mut();
         match _self.rx.poll_item(ctx, &mut _self.waker) {

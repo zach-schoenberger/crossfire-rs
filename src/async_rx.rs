@@ -152,6 +152,8 @@ impl<T> AsyncRx<T> {
         self.recv.is_empty()
     }
 
+    /// Internal function might change in the future. For public version, use AsyncStream::poll_item() instead
+    ///
     /// Returns `Ok(T)` on successful.
     ///
     /// Return Err([TryRecvError::Empty]) for Poll::Pending case.
