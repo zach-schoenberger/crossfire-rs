@@ -1,4 +1,4 @@
-use crate::async_rx::AsyncRx;
+use crate::async_rx::{AsyncRx, TryRecvError};
 use crate::locked_waker::LockedWaker;
 use futures::stream;
 use std::fmt;
@@ -30,8 +30,33 @@ impl<T> AsyncStream<T>
 where
     T: Unpin + Send + 'static,
 {
+    #[inline(always)]
     pub fn new(rx: AsyncRx<T>) -> Self {
         Self { rx, waker: None, ended: false }
+    }
+
+    /// Try to receive message, non-blocking.
+    ///
+    /// Returns `Ok(T)` on successful.
+    ///
+    /// Returns Err([TryRecvError::Empty]) when channel is empty.
+    ///
+    /// Returns Err([TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
+    #[inline]
+    pub fn try_recv(&self) -> Result<T, TryRecvError> {
+        self.rx.try_recv()
+    }
+
+    /// Probe possible messages in the channel (not accurate)
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.rx.len()
+    }
+
+    /// Whether there's message in the channel (not accurate)
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.rx.is_empty()
     }
 
     /// poll_item() will try to receive message, if not successful, will register notification for
