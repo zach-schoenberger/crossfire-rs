@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.8] - 2025-07-14
+
+### Added
+
+- AsyncStream: Add try_recv(), len() & is_empty()
+
 ## [2.0.7] - 2025-07-13
 
 ### Added
