@@ -1,4 +1,5 @@
 use crate::channel::*;
+use crate::sink::AsyncSink;
 #[cfg(feature = "tokio")]
 pub use crossbeam::channel::SendTimeoutError;
 use crossbeam::channel::Sender;
@@ -121,6 +122,8 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
         return SendTimeoutFuture { tx: &self, item: Some(item), waker: None, sleep };
     }
 
+    /// Internal function might change in the future. For public version, use AsyncSink::poll_send() instead
+    ///
     /// Returns `Ok(())` on message sent.
     ///
     /// Returns Err([TrySendError::Full]) for Poll::Pending case.
@@ -233,6 +236,11 @@ impl<T> AsyncTx<T> {
             }
             Err(e) => return Err(e),
         }
+    }
+
+    #[inline]
+    pub fn into_sink(self) -> AsyncSink<T> {
+        AsyncSink::new(self)
     }
 }
 

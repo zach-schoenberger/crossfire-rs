@@ -11,7 +11,6 @@ use std::task::*;
 pub struct AsyncStream<T> {
     rx: AsyncRx<T>,
     waker: Option<LockedWaker>,
-    phan: std::marker::PhantomData<T>,
     ended: bool,
 }
 
@@ -32,7 +31,7 @@ where
     T: Unpin + Send + 'static,
 {
     pub fn new(rx: AsyncRx<T>) -> Self {
-        Self { rx, waker: None, phan: Default::default(), ended: false }
+        Self { rx, waker: None, ended: false }
     }
 
     /// poll_item() will try to receive message, if not successful, will register notification for

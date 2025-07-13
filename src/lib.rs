@@ -194,6 +194,7 @@ mod async_tx;
 pub use async_tx::*;
 mod async_rx;
 pub use async_rx::*;
+pub mod sink;
 pub mod stream;
 
 #[cfg(test)]
