@@ -1,11 +1,6 @@
-name: Rust
+name: cron-master
 
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - ready_for_review
   schedule: [cron: "0 */5 * * *"]
   workflow_dispatch:
 

@@ -1,0 +1,31 @@
+name: fast-validation
+
+on:
+  push:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_and_test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Build with default
+      run: cargo build --verbose
+
+    - name: Build with tokio
+      run: cargo build -F tokio --verbose
+
+    - name: Build with async_std
+      run: cargo build -F async_std --verbose
+
+    - name: Run basic tests with tokio
+      run: make test basic
+
+    - name: Run timeout tests with async_std
+      run: make test_async_std timeout
