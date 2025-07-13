@@ -1,5 +1,6 @@
 use super::common::*;
 use crate::*;
+use captains_log::logfn;
 use log::*;
 use rstest::*;
 use std::sync::{
@@ -8,6 +9,7 @@ use std::sync::{
 };
 use std::time::Duration;
 
+#[logfn]
 #[rstest]
 fn test_sync() {
     use futures::FutureExt;
@@ -91,6 +93,7 @@ fn test_sync() {
     });
 }
 
+#[logfn]
 #[rstest]
 #[case(spsc::bounded_async::<usize>(100))]
 #[case(mpsc::bounded_async::<usize>(100))]
@@ -116,6 +119,7 @@ fn test_basic_bounded_rx_drop<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     });
 }
 
+#[logfn]
 #[rstest]
 #[case(spsc::unbounded_async::<usize>())]
 #[case(mpsc::unbounded_async::<usize>())]
@@ -141,6 +145,7 @@ fn test_basic_unbounded_rx_drop<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize
     });
 }
 
+#[logfn]
 #[rstest]
 #[case(spsc::bounded_async::<i32>(10))]
 #[case(mpsc::bounded_async::<i32>(10))]
@@ -186,6 +191,7 @@ fn test_basic_bounded_1_thread<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
     });
 }
 
+#[logfn]
 #[rstest]
 #[case(spsc::unbounded_async::<i32>())]
 #[case(mpsc::unbounded_async::<i32>())]
@@ -228,6 +234,7 @@ fn test_basic_unbounded_1_thread<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
     });
 }
 
+#[logfn]
 #[rstest]
 #[case(spsc::unbounded_async::<i32>())]
 #[case(mpsc::unbounded_async::<i32>())]
@@ -262,6 +269,7 @@ fn test_basic_unbounded_idle_select<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32
     });
 }
 
+#[logfn]
 #[rstest]
 #[case(spsc::bounded_async::<i32>(10))]
 #[case(mpsc::bounded_async::<i32>(10))]
@@ -294,6 +302,7 @@ fn test_basic_bounded_recv_after_sender_close<T: AsyncTxTrait<i32>, R: AsyncRxTr
     });
 }
 
+#[logfn]
 #[rstest]
 #[case(spsc::unbounded_async::<i32>())]
 #[case(mpsc::unbounded_async::<i32>())]
@@ -352,6 +361,7 @@ fn test_basic_timeout_recv_async_waker<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32
     });
 }
 
+#[logfn]
 #[rstest]
 #[case(spsc::unbounded_async::<i32>())]
 #[case(mpsc::unbounded_async::<i32>())]
@@ -386,6 +396,7 @@ fn test_basic_unbounded_recv_timeout_async<T: BlockingTxTrait<i32>, R: AsyncRxTr
     }
 }
 
+#[logfn]
 #[rstest]
 #[case(spsc::bounded_async::<i32>(10))]
 #[case(mpsc::bounded_async::<i32>(10))]
@@ -446,6 +457,7 @@ fn test_basic_send_timeout_async<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
     }
 }
 
+#[logfn]
 #[rstest]
 #[case(mpmc::bounded_async::<i32>(1))]
 fn test_pressure_bounded_timeout_async(
@@ -565,6 +577,7 @@ fn test_pressure_bounded_timeout_async(
     }
 }
 
+#[logfn]
 #[rstest]
 #[case(spsc::bounded_async::<usize>(1))]
 #[case(spsc::bounded_async::<usize>(10))]
@@ -611,6 +624,7 @@ fn test_pressure_bounded_async_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize
     });
 }
 
+#[logfn]
 #[rstest]
 #[case(mpsc::bounded_async::<usize>(1), 10)]
 #[case(mpsc::bounded_async::<usize>(1), 100)]
@@ -680,6 +694,7 @@ fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
     });
 }
 
+#[logfn]
 #[rstest]
 #[case(mpmc::bounded_async::<usize>(1), 100, 10)]
 #[case(mpmc::bounded_async::<usize>(1), 10, 100)]

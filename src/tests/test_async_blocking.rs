@@ -1,5 +1,6 @@
 use super::common::*;
 use crate::*;
+use captains_log::logfn;
 use log::*;
 use rstest::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -7,6 +8,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+#[logfn]
 #[rstest]
 #[case(spsc::bounded_tx_async_rx_blocking::<usize>(100))]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(100))]
@@ -49,6 +51,7 @@ fn test_basic_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTrai
     let _ = th.join();
 }
 
+#[logfn]
 #[rstest]
 #[case(spsc::bounded_tx_async_rx_blocking::<usize>(100))]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(100))]
@@ -98,6 +101,7 @@ fn test_timeout_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTr
     let _ = th.join();
 }
 
+#[logfn]
 #[rstest]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(10), 8)]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(10), 100)]
@@ -163,6 +167,7 @@ fn test_basic_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
     let _ = th.join();
 }
 
+#[logfn]
 #[rstest]
 #[case(spsc::bounded_tx_async_rx_blocking::<usize>(1))]
 #[case(spsc::bounded_tx_async_rx_blocking::<usize>(10))]
@@ -211,6 +216,7 @@ fn test_pressure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxT
     assert_eq!(counter.as_ref().load(Ordering::Acquire), round);
 }
 
+#[logfn]
 #[rstest]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(10), 8)]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(10), 10)]
@@ -270,6 +276,7 @@ fn test_pressure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
     assert_eq!(counter.as_ref().load(Ordering::Acquire), round * (tx_count));
 }
 
+#[logfn]
 #[rstest]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 8, 8)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 100, 100)]
