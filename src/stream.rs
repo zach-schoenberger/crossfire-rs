@@ -1,20 +1,30 @@
 use crate::async_rx::AsyncRx;
 use crate::locked_waker::LockedWaker;
 use futures::stream;
+use std::fmt;
 use std::pin::Pin;
 use std::task::*;
 
 /// Constructed by [AsyncRx::into_stream()](crate::AsyncRx::into_stream())
 ///
 /// Implemented futures::stream::Stream;
-pub struct AsyncStream<T>
-where
-    T: Unpin + Send + 'static,
-{
+pub struct AsyncStream<T> {
     rx: AsyncRx<T>,
     waker: Option<LockedWaker>,
     phan: std::marker::PhantomData<T>,
     ended: bool,
+}
+
+impl<T> fmt::Debug for AsyncStream<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "AsyncStream")
+    }
+}
+
+impl<T> fmt::Display for AsyncStream<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "AsyncStream")
+    }
 }
 
 impl<T> AsyncStream<T>
@@ -82,10 +92,7 @@ where
     }
 }
 
-impl<T> Drop for AsyncStream<T>
-where
-    T: Unpin + Send + 'static,
-{
+impl<T> Drop for AsyncStream<T> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
             self.rx.shared.clear_recv_wakers(waker.get_seq());

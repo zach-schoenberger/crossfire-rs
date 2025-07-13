@@ -63,6 +63,12 @@ impl<T> fmt::Debug for AsyncRx<T> {
     }
 }
 
+impl<T> fmt::Display for AsyncRx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "AsyncRx")
+    }
+}
+
 impl<T> Drop for AsyncRx<T> {
     fn drop(&mut self) {
         self.shared.close_rx();
@@ -342,7 +348,9 @@ impl<T> Future for ReceiveTimeoutFuture<'_, T> {
 }
 
 /// For writing generic code with MAsyncRx & AsyncRx
-pub trait AsyncRxTrait<T: Unpin + Send + 'static>: Send + 'static {
+pub trait AsyncRxTrait<T: Unpin + Send + 'static>:
+    Send + 'static + fmt::Debug + fmt::Display
+{
     /// Receive message, will await when channel is empty.
     ///
     /// Returns `Ok(T)` when successful.
@@ -426,6 +434,18 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
 ///
 /// You can use `into()` to convert it to `AsyncRx<T>`.
 pub struct MAsyncRx<T>(pub(crate) AsyncRx<T>);
+
+impl<T> fmt::Debug for MAsyncRx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MAsyncRx")
+    }
+}
+
+impl<T> fmt::Display for MAsyncRx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MAsyncRx")
+    }
+}
 
 unsafe impl<T: Send> Sync for MAsyncRx<T> {}
 

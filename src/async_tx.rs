@@ -54,13 +54,19 @@ pub struct AsyncTx<T> {
     _phan: PhantomData<Cell<()>>,
 }
 
-unsafe impl<T: Send> Send for AsyncTx<T> {}
-
 impl<T> fmt::Debug for AsyncTx<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "AsyncTx")
     }
 }
+
+impl<T> fmt::Display for AsyncTx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "AsyncTx")
+    }
+}
+
+unsafe impl<T: Send> Send for AsyncTx<T> {}
 
 impl<T> Drop for AsyncTx<T> {
     fn drop(&mut self) {
@@ -337,7 +343,9 @@ impl<T: Unpin + Send + 'static> Future for SendTimeoutFuture<'_, T> {
 }
 
 /// For writing generic code with MAsyncTx & AsyncTx
-pub trait AsyncTxTrait<T: Unpin + Send + 'static>: Send + 'static {
+pub trait AsyncTxTrait<T: Unpin + Send + 'static>:
+    Send + 'static + fmt::Debug + fmt::Display
+{
     /// Just for debugging purpose, to monitor queue size
     #[cfg(test)]
     fn get_waker_size(&self) -> (usize, usize);
@@ -424,6 +432,18 @@ impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for AsyncTx<T> {
 ///
 /// You can use `into()` to convert it to `AsyncTx<T>`.
 pub struct MAsyncTx<T>(pub(crate) AsyncTx<T>);
+
+impl<T> fmt::Debug for MAsyncTx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MAsyncTx")
+    }
+}
+
+impl<T> fmt::Display for MAsyncTx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MAsyncTx")
+    }
+}
 
 unsafe impl<T: Send> Sync for MAsyncTx<T> {}
 

@@ -53,6 +53,12 @@ impl<T> fmt::Debug for Rx<T> {
     }
 }
 
+impl<T> fmt::Display for Rx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Rx")
+    }
+}
+
 impl<T> Drop for Rx<T> {
     fn drop(&mut self) {
         self.shared.close_rx();
@@ -141,6 +147,18 @@ impl<T> Rx<T> {
 /// You can use `into()` to convert it to `Rx<T>`.
 pub struct MRx<T>(pub(crate) Rx<T>);
 
+impl<T> fmt::Debug for MRx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MRx")
+    }
+}
+
+impl<T> fmt::Display for MRx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MRx")
+    }
+}
+
 unsafe impl<T: Send> Sync for MRx<T> {}
 
 impl<T> MRx<T> {
@@ -182,7 +200,7 @@ impl<T> From<MRx<T>> for Rx<T> {
 }
 
 /// For writing generic code with MRx & Rx
-pub trait BlockingRxTrait<T: Send + 'static>: Send + 'static {
+pub trait BlockingRxTrait<T: Send + 'static>: Send + 'static + fmt::Debug + fmt::Display {
     /// Receive message, will block when channel is empty.
     ///
     /// Returns `Ok(T)` when successful.

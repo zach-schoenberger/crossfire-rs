@@ -53,6 +53,12 @@ impl<T> fmt::Debug for Tx<T> {
     }
 }
 
+impl<T> fmt::Display for Tx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Tx")
+    }
+}
+
 impl<T> Drop for Tx<T> {
     fn drop(&mut self) {
         self.shared.close_tx();
@@ -141,6 +147,18 @@ impl<T> Tx<T> {
 /// You can use `into()` to convert it to `Tx<T>`.
 pub struct MTx<T>(pub(crate) Tx<T>);
 
+impl<T> fmt::Debug for MTx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MTx")
+    }
+}
+
+impl<T> fmt::Display for MTx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MTx")
+    }
+}
+
 unsafe impl<T: Send> Sync for MTx<T> {}
 
 impl<T> MTx<T> {
@@ -176,7 +194,7 @@ impl<T> DerefMut for MTx<T> {
 }
 
 /// For writing generic code with MTx & Tx
-pub trait BlockingTxTrait<T: Send + 'static>: Send + 'static {
+pub trait BlockingTxTrait<T: Send + 'static>: Send + 'static + fmt::Debug + fmt::Display {
     /// Send message. Will block when channel is full.
     ///
     /// Returns `Ok(())` on successful.
