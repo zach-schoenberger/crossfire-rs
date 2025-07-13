@@ -1,5 +1,5 @@
-use crate::async_rx::{AsyncRx, TryRecvError};
 use crate::locked_waker::LockedWaker;
+use crate::{AsyncRx, TryRecvError};
 use futures::stream;
 use std::fmt;
 use std::pin::Pin;

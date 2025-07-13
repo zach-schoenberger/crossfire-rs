@@ -1,9 +1,6 @@
 use crate::channel::*;
 use crate::sink::AsyncSink;
-#[cfg(feature = "tokio")]
-pub use crossbeam::channel::SendTimeoutError;
 use crossbeam::channel::Sender;
-pub use crossbeam::channel::{SendError, TrySendError};
 use std::cell::Cell;
 use std::fmt;
 use std::future::Future;

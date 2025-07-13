@@ -1,9 +1,6 @@
 use crate::channel::*;
 use crate::stream::AsyncStream;
 use crossbeam::channel::Receiver;
-#[cfg(feature = "tokio")]
-pub use crossbeam::channel::RecvTimeoutError;
-pub use crossbeam::channel::{RecvError, TryRecvError};
 use std::cell::Cell;
 use std::fmt;
 use std::future::Future;
