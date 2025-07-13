@@ -15,6 +15,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.7] - 2025-07-13
+
+### Added
+
+- AsyncStream: Add poll_item() for writing custom future, as a replacement to AsyncRx's poll_item(),
+ but without the need of LockedWaker.
+
+- Add AsyncSink::poll_send() for writing custom future, as a replacement to AsyncTx's poll_send(),
+ but without the need of LockedWaker.
+
+- Implement Debug & Display for all senders and receivers.
+
+### Remove
+
+- Hide LockedWaker, since AsyncRx::poll_item() and AsyncTx::poll_send() is hidden.
+
+### Changed
+
+- Optimise speed for SPSC & MPSC up to 60% (with WeakCell)
+
+- Add execution time log to test cases.
+
+### Fixed
+
+- Fix LockedQueue empty flag (not affecting usage, just not accurate to internal test cases)
+
 ## [2.0.6] - 2025-07-10
 
 ### Added
