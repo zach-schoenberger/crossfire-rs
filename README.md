@@ -40,7 +40,7 @@ overhead on async context over crossbeam-channel which in blocking context.
 Benchmark is written in criterion framework. You can run benchmark by:
 
 ```
-cargo bench
+cargo bench --bench crossfire
 ```
 
 More benchmark data is on [wiki](https://github.com/frostyplanet/crossfire-rs/wiki). Here are some of the results:

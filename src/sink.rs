@@ -35,9 +35,9 @@ impl<T: Send + Unpin + 'static> AsyncSink<T> {
     ///
     /// Returns `Ok(())` on message sent.
     ///
-    /// Returns Err([TrySendError::Full]) for Poll::Pending case.
+    /// Returns Err([crate::TrySendError::Full]) for Poll::Pending case.
     ///
-    /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
+    /// Returns Err([crate::TrySendError::Disconnected]) when all Rx dropped.
     #[inline]
     pub fn poll_send(&mut self, ctx: &mut Context, item: T) -> Result<(), TrySendError<T>> {
         self.tx.poll_send(ctx, item, &mut self.waker)

@@ -64,9 +64,9 @@ where
     ///
     /// Returns `Ok(T)` on successful.
     ///
-    /// Return Err([TryRecvError::Empty]) for Poll::Pending case.
+    /// Return Err([crate::TryRecvError::Empty]) for Poll::Pending case.
     ///
-    /// Return Err([TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
+    /// Return Err([crate::TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
     #[inline]
     pub fn poll_item(&mut self, ctx: &mut Context) -> Poll<Option<T>> {
         if self.ended {
