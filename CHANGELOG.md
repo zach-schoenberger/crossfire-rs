@@ -15,6 +15,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.9] - 2025-07-16
+
+### Added
+
+- Add is_disconnected() to sender and receiver type.
+
+- Add Deref for AsyncSink to AsyncTx, and AsyncStream to AsyncRx, remove duplicated code.
+
+### Fixed
+
+- Fix a rare deadlock, when only one future in async runtime (for example channel async-blocking or blocking-async).
+Runtime will spuriously wake up with changed Waker.
+
+### Removed
+
+- Remove send_blocking() & recv_blocking(), which is anti-pattern. (Calling function that blocks might lead to deadlock in async runtime)
+
 ## [2.0.8] - 2025-07-14
 
 ### Added
