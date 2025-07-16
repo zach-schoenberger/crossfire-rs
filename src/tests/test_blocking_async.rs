@@ -260,12 +260,11 @@ fn test_pressure_tx_multi_blocking_multi_rx_async(
     }
     drop(tx);
     runtime_block_on!(async move {
-        let (noti_tx, noti_rx) = mpmc::unbounded_async();
+        let mut th_co = Vec::new();
         for _rx_i in 0..rx_count {
             let _rx = rx.clone();
-            let mut _noti_tx = noti_tx.clone();
             let _counter = counter.clone();
-            async_spawn!(async move {
+            th_co.push(async_spawn!(async move {
                 'A: loop {
                     match _rx.recv().await {
                         Ok(_i) => {
@@ -275,17 +274,12 @@ fn test_pressure_tx_multi_blocking_multi_rx_async(
                         Err(_) => break 'A,
                     }
                 }
-                debug!("rx {} exiting", _rx_i);
-                let _ = _noti_tx.send(_rx_i);
                 debug!("rx {} exit", _rx_i);
-            });
+            }));
         }
         drop(rx);
-        drop(noti_tx);
-        for _ in 0..(rx_count) {
-            if let Err(_) = noti_rx.recv().await {
-                break;
-            }
+        for th in th_co {
+            let _ = th.await;
         }
         assert_eq!(counter.as_ref().load(Ordering::Acquire), round);
     });

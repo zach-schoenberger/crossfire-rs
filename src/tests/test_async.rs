@@ -646,7 +646,6 @@ fn test_pressure_bounded_async_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize
 fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
 ) {
-    let (noti_tx, noti_rx) = mpmc::bounded_async::<usize>(tx_count);
     let (tx, rx) = channel;
 
     runtime_block_on!(async move {
@@ -655,7 +654,6 @@ fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
         let mut th_s = Vec::new();
         for _tx_i in 0..tx_count {
             let _tx = tx.clone();
-            let mut _noti_tx = noti_tx.clone();
             let _round = round;
             th_s.push(async_spawn!(async move {
                 for i in 0.._round {
@@ -664,7 +662,6 @@ fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
                         _ => {}
                     }
                 }
-                let _ = _noti_tx.send(_tx_i).await;
                 debug!("tx {} exit", _tx_i);
             }));
         }
@@ -679,12 +676,6 @@ fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
             }
         }
         drop(rx);
-        drop(noti_tx);
-        for _ in 0..tx_count {
-            if let Err(_) = noti_rx.recv().await {
-                break;
-            }
-        }
         for th in th_s {
             let _ = th.await;
         }
@@ -709,7 +700,6 @@ fn test_pressure_bounded_async_multi(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, MAsyncRx<usize>), #[case] tx_count: usize,
     #[case] rx_count: usize,
 ) {
-    let (noti_tx, noti_rx) = mpmc::bounded_async::<usize>(tx_count + rx_count);
     let (tx, rx) = channel;
     runtime_block_on!(async move {
         let counter = Arc::new(AtomicUsize::new(0));
@@ -717,7 +707,6 @@ fn test_pressure_bounded_async_multi(
         let mut th_s = Vec::new();
         for _tx_i in 0..tx_count {
             let _tx = tx.clone();
-            let mut _noti_tx = noti_tx.clone();
             let _round = round;
             th_s.push(async_spawn!(async move {
                 for i in 0.._round {
@@ -726,13 +715,11 @@ fn test_pressure_bounded_async_multi(
                         _ => {}
                     }
                 }
-                let _ = _noti_tx.send(_tx_i);
                 debug!("tx {} exit", _tx_i);
             }));
         }
         for _rx_i in 0..rx_count {
             let _rx = rx.clone();
-            let mut _noti_tx = noti_tx.clone();
             let _counter = counter.clone();
             th_s.push(async_spawn!(async move {
                 'A: loop {
@@ -744,18 +731,11 @@ fn test_pressure_bounded_async_multi(
                         Err(_) => break 'A,
                     }
                 }
-                let _ = _noti_tx.send(_rx_i);
                 debug!("rx {} exit", _rx_i);
             }));
         }
         drop(tx);
         drop(rx);
-        drop(noti_tx);
-        for _ in 0..(rx_count + tx_count) {
-            if let Err(_) = noti_rx.recv().await {
-                break;
-            }
-        }
         for th in th_s {
             let _ = th.await;
         }

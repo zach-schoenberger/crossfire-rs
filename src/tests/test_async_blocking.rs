@@ -119,7 +119,6 @@ fn test_basic_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
     let rx_res = rx.try_recv();
     assert!(rx_res.is_err());
     assert!(rx_res.unwrap_err().is_empty());
-    let (noti_tx, noti_rx) = mpmc::unbounded_blocking::<usize>();
     let batch_1: usize = 100;
     let batch_2: usize = 200;
     let th = thread::spawn(move || {
@@ -136,17 +135,11 @@ fn test_basic_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
         let res = rx.recv();
         assert!(res.is_err());
         // Wait for spawn exit
-        for _ in 0..tx_count {
-            if let Err(_) = noti_rx.recv() {
-                break;
-            }
-        }
     });
     runtime_block_on!(async move {
         let mut th_s = Vec::new();
-        for tx_i in 0..tx_count {
+        for _tx_i in 0..tx_count {
             let _tx = tx.clone();
-            let _noti_tx = noti_tx.clone();
             th_s.push(async_spawn!(async move {
                 for i in 0..batch_1 {
                     let tx_res = _tx.send(i).await;
@@ -156,7 +149,6 @@ fn test_basic_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
                     assert!(_tx.send(10 + i).await.is_ok());
                     sleep(Duration::from_millis(2)).await;
                 }
-                _noti_tx.send(tx_i).expect("noti send ok");
             }));
         }
         drop(tx);
@@ -248,27 +240,22 @@ fn test_pressure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
         debug!("rx exit");
     });
     runtime_block_on!(async move {
-        let (noti_tx, noti_rx) = mpmc::unbounded_async::<usize>();
+        let mut th_co = Vec::new();
         for _tx_i in 0..tx_count {
             let _tx = tx.clone();
-            let mut _noti_tx = noti_tx.clone();
-            async_spawn!(async move {
+            th_co.push(async_spawn!(async move {
                 for i in 0..round {
                     match _tx.send(i).await {
                         Err(e) => panic!("{}", e),
                         _ => {}
                     }
                 }
-                let _ = _noti_tx.send(_tx_i);
                 debug!("tx {} exit", _tx_i);
-            });
+            }));
         }
         drop(tx);
-        drop(noti_tx);
-        for _ in 0..(tx_count) {
-            if let Err(_) = noti_rx.recv().await {
-                break;
-            }
+        for th in th_co {
+            let _ = th.await;
         }
     });
     let _ = th.join();
@@ -309,27 +296,22 @@ fn test_pressure_multi_tx_async_multi_rx_blocking(
     }
     drop(rx);
     runtime_block_on!(async move {
-        let (noti_tx, noti_rx) = mpmc::unbounded_async::<usize>();
+        let mut th_co = Vec::new();
         for _tx_i in 0..tx_count {
             let _tx = tx.clone();
-            let mut _noti_tx = noti_tx.clone();
-            async_spawn!(async move {
+            th_co.push(async_spawn!(async move {
                 for i in 0..round {
                     match _tx.send(i).await {
                         Err(e) => panic!("{}", e),
                         _ => {}
                     }
                 }
-                let _ = _noti_tx.send(_tx_i);
                 debug!("tx {} exit", _tx_i);
-            });
+            }));
         }
         drop(tx);
-        drop(noti_tx);
-        for _ in 0..(tx_count) {
-            if let Err(_) = noti_rx.recv().await {
-                break;
-            }
+        for th in th_co {
+            let _ = th.await;
         }
     });
     for th in rx_th_s {
