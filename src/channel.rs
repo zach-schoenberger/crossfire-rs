@@ -239,6 +239,21 @@ impl<T> ChannelShared<T> {
     pub(crate) fn clear_recv_wakers(&self, seq: u64) {
         self.recvs.clear_wakers(seq);
     }
+
+    pub fn detect_async_backoff(&self) -> i8 {
+        #[cfg(feature = "tokio")]
+        {
+            use tokio::runtime::{Handle, RuntimeFlavor};
+            if Handle::current().runtime_flavor() == RuntimeFlavor::CurrentThread {
+                return 0;
+            }
+        }
+        if self.bound_size > Some(0) && self.bound_size <= Some(2) {
+            return 6;
+        } else {
+            return 0;
+        }
+    }
 }
 
 /// If timed out, returns false
