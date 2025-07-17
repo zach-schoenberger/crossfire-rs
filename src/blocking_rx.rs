@@ -1,4 +1,4 @@
-use crate::channel::*;
+use crate::{channel::*, AsyncRx};
 use crossbeam::channel::Receiver;
 use std::cell::Cell;
 use std::fmt;
