@@ -1,4 +1,4 @@
-use crate::{channel::*, AsyncTx};
+use crate::channel::*;
 use crossbeam::channel::Sender;
 use std::cell::Cell;
 use std::fmt;
@@ -328,11 +328,5 @@ impl<T> AsRef<ChannelShared> for Tx<T> {
 impl<T> AsRef<ChannelShared> for MTx<T> {
     fn as_ref(&self) -> &ChannelShared {
         &self.0.shared
-    }
-}
-
-impl<T> From<AsyncTx<T>> for Tx<T> {
-    fn from(value: AsyncTx<T>) -> Self {
-        Self { sender: value.sender.clone(), shared: value.shared.clone(), _phan: PhantomData }
     }
 }

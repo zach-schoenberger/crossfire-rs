@@ -1,8 +1,6 @@
-use std::{fmt, time::Duration};
-
-use crossbeam::channel::{RecvError, RecvTimeoutError, TryRecvError};
-
 use crate::{AsyncRxTrait, BlockingRxTrait, ChannelShared, MAsyncRx, ReceiveFuture};
+use crossbeam::channel::{RecvError, RecvTimeoutError, TryRecvError};
+use std::{fmt, time::Duration};
 
 /// Universal-consumer (receiver) that works in both async and sync contexts.
 ///
