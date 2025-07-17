@@ -9,6 +9,8 @@ use std::time::Duration;
 
 /// Single producer (sender) that works in blocking context.
 ///
+/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
+///
 /// **NOTE: Tx is not Clone, nor Sync.**
 /// If you need concurrent access, use [MTx](crate::MTx) instead.
 ///
@@ -127,28 +129,29 @@ impl<T> Tx<T> {
         }
     }
 
-    /// Probe possible messages in the channel (not accurate)
+    /// The number of messages in the channel at the moment
     #[inline]
     pub fn len(&self) -> usize {
         self.sender.len()
     }
 
-    /// Whether there's message in the channel (not accurate)
+    /// Whether channel is empty at the moment
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.sender.is_empty()
     }
 
-    /// Return true if the other side has closed
+    /// Whether the channel is full at the moment
     #[inline]
-    pub fn is_disconnected(&self) -> bool {
-        self.shared.get_rx_count() == 0
+    pub fn is_full(&self) -> bool {
+        self.sender.is_full()
     }
 }
 
 /// Multi-producer (sender) that works in blocking context.
 ///
 /// Inherits [`Tx<T>`] and implements [Clone].
+/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
 ///
 /// You can use `into()` to convert it to `Tx<T>`.
 pub struct MTx<T>(pub(crate) Tx<T>);
@@ -200,7 +203,9 @@ impl<T> DerefMut for MTx<T> {
 }
 
 /// For writing generic code with MTx & Tx
-pub trait BlockingTxTrait<T: Send + 'static>: Send + 'static + fmt::Debug + fmt::Display {
+pub trait BlockingTxTrait<T: Send + 'static>:
+    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared>
+{
     /// Send message. Will block when channel is full.
     ///
     /// Returns `Ok(())` on successful.
@@ -227,14 +232,20 @@ pub trait BlockingTxTrait<T: Send + 'static>: Send + 'static + fmt::Debug + fmt:
     /// Returns Err([SendTimeoutError::Disconnected]) when all Rx dropped.
     fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>>;
 
-    /// Probe possible messages in the channel (not accurate)
+    /// The number of messages in the channel at the moment
     fn len(&self) -> usize;
 
-    /// Whether there's message in the channel (not accurate)
+    /// Whether channel is empty at the moment
     fn is_empty(&self) -> bool;
 
+    /// Whether the channel is full at the moment
+    fn is_full(&self) -> bool;
+
     /// Return true if the other side has closed
-    fn is_disconnected(&self) -> bool;
+    #[inline(always)]
+    fn is_disconnected(&self) -> bool {
+        self.as_ref().is_disconnected()
+    }
 }
 
 impl<T: Send + 'static> BlockingTxTrait<T> for Tx<T> {
@@ -264,8 +275,8 @@ impl<T: Send + 'static> BlockingTxTrait<T> for Tx<T> {
     }
 
     #[inline(always)]
-    fn is_disconnected(&self) -> bool {
-        Tx::is_disconnected(self)
+    fn is_full(&self) -> bool {
+        Tx::is_full(self)
     }
 }
 
@@ -296,7 +307,26 @@ impl<T: Send + 'static> BlockingTxTrait<T> for MTx<T> {
     }
 
     #[inline(always)]
-    fn is_disconnected(&self) -> bool {
-        self.0.is_disconnected()
+    fn is_full(&self) -> bool {
+        self.0.is_full()
+    }
+}
+
+impl<T> Deref for Tx<T> {
+    type Target = ChannelShared;
+    fn deref(&self) -> &ChannelShared {
+        &self.shared
+    }
+}
+
+impl<T> AsRef<ChannelShared> for Tx<T> {
+    fn as_ref(&self) -> &ChannelShared {
+        &self.shared
+    }
+}
+
+impl<T> AsRef<ChannelShared> for MTx<T> {
+    fn as_ref(&self) -> &ChannelShared {
+        &self.0.shared
     }
 }

@@ -5,12 +5,14 @@ use std::cell::Cell;
 use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
 /// Single producer (sender) that works in async context.
+///
+/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
 ///
 /// **NOTE: AsyncTx is not Clone, nor Sync.**
 /// If you need concurrent access, use [MAsyncTx](crate::MAsyncTx) instead.
@@ -69,6 +71,54 @@ unsafe impl<T: Send> Send for AsyncTx<T> {}
 impl<T> Drop for AsyncTx<T> {
     fn drop(&mut self) {
         self.shared.close_tx();
+    }
+}
+
+impl<T> AsyncTx<T> {
+    #[inline]
+    pub(crate) fn new(sender: Sender<T>, shared: Arc<ChannelShared>) -> Self {
+        Self { sender, shared, _phan: Default::default() }
+    }
+
+    /// Try to send message, non-blocking
+    ///
+    /// Returns `Ok(())` when successful.
+    ///
+    /// Returns Err([TrySendError::Full]) on channel full for bounded channel.
+    ///
+    /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
+    #[inline]
+    pub fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
+        match self.sender.try_send(item) {
+            Err(e) => return Err(e),
+            Ok(_) => {
+                self.shared.on_send();
+                return Ok(());
+            }
+        }
+    }
+
+    /// The number of messages in the channel at the moment
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.sender.len()
+    }
+
+    /// Whether channel is empty at the moment
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.sender.is_empty()
+    }
+
+    /// Whether the channel is full at the moment
+    #[inline]
+    pub fn is_full(&self) -> bool {
+        self.sender.is_full()
+    }
+
+    #[inline]
+    pub fn into_sink(self) -> AsyncSink<T> {
+        AsyncSink::new(self)
     }
 }
 
@@ -162,61 +212,6 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
             self.shared.cancel_send_waker(waker);
         }
         return r;
-    }
-}
-
-impl<T> AsyncTx<T> {
-    #[inline]
-    pub(crate) fn new(sender: Sender<T>, shared: Arc<ChannelShared>) -> Self {
-        Self { sender, shared, _phan: Default::default() }
-    }
-
-    /// Try to send message, non-blocking
-    ///
-    /// Returns `Ok(())` when successful.
-    ///
-    /// Returns Err([TrySendError::Full]) on channel full for bounded channel.
-    ///
-    /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
-    #[inline]
-    pub fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
-        match self.sender.try_send(item) {
-            Err(e) => return Err(e),
-            Ok(_) => {
-                self.shared.on_send();
-                return Ok(());
-            }
-        }
-    }
-
-    /// Probe possible messages in the channel (not accurate)
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.sender.len()
-    }
-
-    /// Whether there's message in the channel (not accurate)
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.sender.is_empty()
-    }
-
-    /// Return true if the other side has closed
-    #[inline]
-    pub fn is_disconnected(&self) -> bool {
-        self.shared.get_rx_count() == 0
-    }
-
-    #[inline]
-    pub fn into_sink(self) -> AsyncSink<T> {
-        AsyncSink::new(self)
-    }
-
-    /// Just for debugging purpose, to monitor queue size
-    #[inline]
-    #[cfg(test)]
-    pub fn get_waker_size(&self) -> (usize, usize) {
-        return self.shared.get_waker_size();
     }
 }
 
@@ -328,12 +323,8 @@ impl<T: Unpin + Send + 'static> Future for SendTimeoutFuture<'_, T> {
 
 /// For writing generic code with MAsyncTx & AsyncTx
 pub trait AsyncTxTrait<T: Unpin + Send + 'static>:
-    Send + 'static + fmt::Debug + fmt::Display
+    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared>
 {
-    /// Just for debugging purpose, to monitor queue size
-    #[cfg(test)]
-    fn get_waker_size(&self) -> (usize, usize);
-
     /// Try to send message, non-blocking
     ///
     /// Returns `Ok(())` when successful.
@@ -343,14 +334,20 @@ pub trait AsyncTxTrait<T: Unpin + Send + 'static>:
     /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
     fn try_send(&self, item: T) -> Result<(), TrySendError<T>>;
 
-    /// Probe possible messages in the channel (not accurate)
+    /// The number of messages in the channel at the moment
     fn len(&self) -> usize;
 
-    /// Whether there's message in the channel (not accurate)
+    /// Whether channel is empty at the moment
     fn is_empty(&self) -> bool;
 
+    /// Whether the channel is full at the moment
+    fn is_full(&self) -> bool;
+
     /// Return true if the other side has closed
-    fn is_disconnected(&self) -> bool;
+    #[inline(always)]
+    fn is_disconnected(&self) -> bool {
+        self.as_ref().is_disconnected()
+    }
 
     /// Send message. Will await when channel is full.
     ///
@@ -378,12 +375,6 @@ pub trait AsyncTxTrait<T: Unpin + Send + 'static>:
 
 impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for AsyncTx<T> {
     #[inline(always)]
-    #[cfg(test)]
-    fn get_waker_size(&self) -> (usize, usize) {
-        AsyncTx::get_waker_size(self)
-    }
-
-    #[inline(always)]
     fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
         AsyncTx::try_send(self, item)
     }
@@ -399,8 +390,8 @@ impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for AsyncTx<T> {
     }
 
     #[inline(always)]
-    fn is_disconnected(&self) -> bool {
-        AsyncTx::is_disconnected(self)
+    fn is_full(&self) -> bool {
+        AsyncTx::is_full(self)
     }
 
     #[inline(always)]
@@ -421,6 +412,7 @@ impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for AsyncTx<T> {
 /// Multi-producer (sender) that works in async context.
 ///
 /// Inherits [`AsyncTx<T>`] and implements [Clone].
+/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
 ///
 /// You can use `into()` to convert it to `AsyncTx<T>`.
 pub struct MAsyncTx<T>(pub(crate) AsyncTx<T>);
@@ -464,34 +456,25 @@ impl<T> Deref for MAsyncTx<T> {
     }
 }
 
-impl<T> DerefMut for MAsyncTx<T> {
-    /// inherit all the functions of [AsyncTx]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for MAsyncTx<T> {
     #[inline(always)]
     fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
         self.0.try_send(item)
     }
 
-    /// Probe possible messages in the channel (not accurate)
     #[inline(always)]
     fn len(&self) -> usize {
         self.0.len()
     }
 
-    /// Whether there's message in the channel (not accurate)
     #[inline(always)]
     fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     #[inline(always)]
-    fn is_disconnected(&self) -> bool {
-        self.0.is_disconnected()
+    fn is_full(&self) -> bool {
+        self.0.is_full()
     }
 
     #[inline(always)]
@@ -507,11 +490,23 @@ impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for MAsyncTx<T> {
     ) -> SendTimeoutFuture<'a, T> {
         self.0.send_timeout(item, duration)
     }
+}
 
-    /// Just for debugging purpose, to monitor queue size
-    #[inline(always)]
-    #[cfg(test)]
-    fn get_waker_size(&self) -> (usize, usize) {
-        self.0.get_waker_size()
+impl<T> Deref for AsyncTx<T> {
+    type Target = ChannelShared;
+    fn deref(&self) -> &ChannelShared {
+        &self.shared
+    }
+}
+
+impl<T> AsRef<ChannelShared> for AsyncTx<T> {
+    fn as_ref(&self) -> &ChannelShared {
+        &self.shared
+    }
+}
+
+impl<T> AsRef<ChannelShared> for MAsyncTx<T> {
+    fn as_ref(&self) -> &ChannelShared {
+        &self.0.shared
     }
 }

@@ -5,12 +5,14 @@ use std::cell::Cell;
 use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
 /// Single consumer (receiver) that works in async context.
+///
+/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
 ///
 /// **NOTE: AsyncRx is not Clone, nor Sync.**
 /// If you need concurrent access, use [MAsyncRx](crate::MAsyncRx) instead.
@@ -143,22 +145,22 @@ impl<T> AsyncRx<T> {
         return ReceiveFuture { rx: &self, waker: None };
     }
 
-    /// Probe possible messages in the channel (not accurate)
+    /// The number of messages in the channel at the moment
     #[inline(always)]
     pub fn len(&self) -> usize {
         self.recv.len()
     }
 
-    /// Whether there's message in the channel (not accurate)
+    /// Whether channel is empty at the moment
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.recv.is_empty()
     }
 
-    /// Return true if the other side has closed
-    #[inline]
-    pub fn is_disconnected(&self) -> bool {
-        self.shared.get_tx_count() == 0
+    /// Whether the channel is full at the moment
+    #[inline(always)]
+    pub fn is_full(&self) -> bool {
+        self.recv.is_full()
     }
 
     /// Internal function might change in the future. For public version, use AsyncStream::poll_item() instead
@@ -210,13 +212,6 @@ impl<T> AsyncRx<T> {
         T: Send + Unpin + 'static,
     {
         AsyncStream::new(self)
-    }
-
-    /// Returns count of tx / rx wakers stored in channel for debug purpose
-    #[inline]
-    #[cfg(test)]
-    pub fn get_waker_size(&self) -> (usize, usize) {
-        return self.shared.get_waker_size();
     }
 }
 
@@ -320,7 +315,7 @@ impl<T> Future for ReceiveTimeoutFuture<'_, T> {
 
 /// For writing generic code with MAsyncRx & AsyncRx
 pub trait AsyncRxTrait<T: Unpin + Send + 'static>:
-    Send + 'static + fmt::Debug + fmt::Display
+    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared>
 {
     /// Receive message, will await when channel is empty.
     ///
@@ -353,18 +348,19 @@ pub trait AsyncRxTrait<T: Unpin + Send + 'static>:
     /// Returns Err([TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
     fn try_recv(&self) -> Result<T, TryRecvError>;
 
-    /// Probe possible messages in the channel (not accurate)
+    /// The number of messages in the channel at the moment
     fn len(&self) -> usize;
 
-    /// Whether there's message in the channel (not accurate)
+    /// Whether channel is empty at the moment
     fn is_empty(&self) -> bool;
 
-    /// Return true if the other side has closed
-    fn is_disconnected(&self) -> bool;
+    /// Whether the channel is full at the moment
+    fn is_full(&self) -> bool;
 
-    /// Returns count of tx / rx wakers stored in channel for debug purpose
-    #[cfg(test)]
-    fn get_waker_size(&self) -> (usize, usize);
+    #[inline(always)]
+    fn is_disconnected(&self) -> bool {
+        self.as_ref().is_disconnected()
+    }
 }
 
 impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
@@ -396,20 +392,15 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
     }
 
     #[inline(always)]
-    fn is_disconnected(&self) -> bool {
-        AsyncRx::is_disconnected(self)
-    }
-
-    #[inline(always)]
-    #[cfg(test)]
-    fn get_waker_size(&self) -> (usize, usize) {
-        AsyncRx::get_waker_size(self)
+    fn is_full(&self) -> bool {
+        AsyncRx::is_full(self)
     }
 }
 
 /// Multi-consumer (receiver) that works in async context.
 ///
 /// Inherits [`AsyncRx<T>`] and implements [Clone].
+/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
 ///
 /// You can use `into()` to convert it to `AsyncRx<T>`.
 pub struct MAsyncRx<T>(pub(crate) AsyncRx<T>);
@@ -467,13 +458,6 @@ impl<T> Deref for MAsyncRx<T> {
     }
 }
 
-impl<T> DerefMut for MAsyncRx<T> {
-    /// inherit all the functions of [AsyncRx]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for MAsyncRx<T> {
     #[inline(always)]
     fn try_recv(&self) -> Result<T, TryRecvError> {
@@ -503,14 +487,26 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for MAsyncRx<T> {
     }
 
     #[inline(always)]
-    fn is_disconnected(&self) -> bool {
-        self.0.is_disconnected()
+    fn is_full(&self) -> bool {
+        self.0.is_full()
     }
+}
 
-    /// Returns count of tx / rx wakers stored in channel for debug purpose
-    #[inline(always)]
-    #[cfg(test)]
-    fn get_waker_size(&self) -> (usize, usize) {
-        self.0.get_waker_size()
+impl<T> Deref for AsyncRx<T> {
+    type Target = ChannelShared;
+    fn deref(&self) -> &ChannelShared {
+        &self.shared
+    }
+}
+
+impl<T> AsRef<ChannelShared> for AsyncRx<T> {
+    fn as_ref(&self) -> &ChannelShared {
+        &self.shared
+    }
+}
+
+impl<T> AsRef<ChannelShared> for MAsyncRx<T> {
+    fn as_ref(&self) -> &ChannelShared {
+        &self.0.shared
     }
 }

@@ -195,6 +195,7 @@ pub use crossbeam::channel::{RecvError, RecvTimeoutError, TryRecvError};
 pub use crossbeam::channel::{SendError, SendTimeoutError, TrySendError};
 
 mod channel;
+pub use channel::ChannelShared;
 mod collections;
 mod locked_waker;
 pub mod mpmc;

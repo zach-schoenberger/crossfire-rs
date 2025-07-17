@@ -3,11 +3,13 @@ use crossbeam::channel::Receiver;
 use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
 /// Single consumer (receiver) that works in blocking context.
+///
+/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
 ///
 /// **NOTE: Rx is not Clone, nor Sync.**
 /// If you need concurrent access, use [MRx](crate::MRx) instead.
@@ -127,28 +129,29 @@ impl<T> Rx<T> {
         }
     }
 
-    /// Probe possible messages in the channel (not accurate)
+    /// The number of messages in the channel at the moment
     #[inline]
     pub fn len(&self) -> usize {
         self.recv.len()
     }
 
-    /// Whether there's message in the channel (not accurate)
+    /// Whether channel is empty at the moment
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.recv.is_empty()
     }
 
-    /// Return true if the other side has closed
-    #[inline]
-    pub fn is_disconnected(&self) -> bool {
-        self.shared.get_tx_count() == 0
+    /// Whether the channel is full at the moment
+    #[inline(always)]
+    pub fn is_full(&self) -> bool {
+        self.recv.is_full()
     }
 }
 
 /// Multi-consumer (receiver) that works in blocking context.
 ///
 /// Inherits [`Rx<T>`] and implements [Clone].
+/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
 ///
 /// You can use `into()` to convert it to `Rx<T>`.
 pub struct MRx<T>(pub(crate) Rx<T>);
@@ -192,13 +195,6 @@ impl<T> Deref for MRx<T> {
     }
 }
 
-impl<T> DerefMut for MRx<T> {
-    /// inherit all the functions of [Rx]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 impl<T> From<MRx<T>> for Rx<T> {
     fn from(rx: MRx<T>) -> Self {
         rx.0
@@ -206,7 +202,9 @@ impl<T> From<MRx<T>> for Rx<T> {
 }
 
 /// For writing generic code with MRx & Rx
-pub trait BlockingRxTrait<T: Send + 'static>: Send + 'static + fmt::Debug + fmt::Display {
+pub trait BlockingRxTrait<T: Send + 'static>:
+    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared>
+{
     /// Receive message, will block when channel is empty.
     ///
     /// Returns `Ok(T)` when successful.
@@ -233,14 +231,20 @@ pub trait BlockingRxTrait<T: Send + 'static>: Send + 'static + fmt::Debug + fmt:
     /// returns Err([RecvTimeoutError::Disconnected]) when all Tx dropped and channel is empty.
     fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError>;
 
-    /// Probe possible messages in the channel (not accurate)
+    /// The number of messages in the channel at the moment
     fn len(&self) -> usize;
 
-    /// Whether there's message in the channel (not accurate)
+    /// Whether channel is empty at the moment
     fn is_empty(&self) -> bool;
 
+    /// Whether the channel is full at the moment
+    fn is_full(&self) -> bool;
+
     /// Return true if the other side has closed
-    fn is_disconnected(&self) -> bool;
+    #[inline(always)]
+    fn is_disconnected(&self) -> bool {
+        self.as_ref().is_disconnected()
+    }
 }
 
 impl<T: Send + 'static> BlockingRxTrait<T> for Rx<T> {
@@ -269,9 +273,9 @@ impl<T: Send + 'static> BlockingRxTrait<T> for Rx<T> {
         Rx::is_empty(self)
     }
 
-    #[inline]
-    fn is_disconnected(&self) -> bool {
-        Rx::is_disconnected(self)
+    #[inline(always)]
+    fn is_full(&self) -> bool {
+        Rx::is_full(self)
     }
 }
 
@@ -291,20 +295,38 @@ impl<T: Send + 'static> BlockingRxTrait<T> for MRx<T> {
         self.0.recv_timeout(timeout)
     }
 
-    /// Probe possible messages in the channel (not accurate)
     #[inline(always)]
     fn len(&self) -> usize {
         self.0.len()
     }
 
-    /// Whether there's message in the channel (not accurate)
     #[inline(always)]
     fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     #[inline(always)]
-    fn is_disconnected(&self) -> bool {
-        self.0.is_disconnected()
+    fn is_full(&self) -> bool {
+        self.0.is_full()
+    }
+}
+
+impl<T> Deref for Rx<T> {
+    type Target = ChannelShared;
+
+    fn deref(&self) -> &ChannelShared {
+        &self.shared
+    }
+}
+
+impl<T> AsRef<ChannelShared> for Rx<T> {
+    fn as_ref(&self) -> &ChannelShared {
+        &self.shared
+    }
+}
+
+impl<T> AsRef<ChannelShared> for MRx<T> {
+    fn as_ref(&self) -> &ChannelShared {
+        &self.0.shared
     }
 }
