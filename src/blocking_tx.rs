@@ -123,7 +123,7 @@ impl<T> Tx<T> {
         match self.sender.send_timeout(item, timeout) {
             Err(e) => return Err(e),
             Ok(_) => {
-                self.shared.on_recv();
+                self.shared.on_send();
                 return Ok(());
             }
         }
