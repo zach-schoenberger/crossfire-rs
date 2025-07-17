@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.10] - 2025-07-17
+
+### Added
+
+- Add Deref/AsRef for sender & receiver type to ChannelShared
+
+- Add is_full(), get_tx_count(), get_rx_count()
+
+### Removed
+
+- Remove DerefMut because it's no used.
+
 ## [2.0.9] - 2025-07-16
 
 ### Added
