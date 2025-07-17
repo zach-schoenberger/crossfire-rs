@@ -14,6 +14,70 @@ fn setup_log() {
 
 #[logfn]
 #[rstest]
+#[case(spsc::bounded_tx_async_rx_blocking(1))]
+#[case(mpsc::bounded_tx_async_rx_blocking(1))]
+#[case(mpmc::bounded_tx_async_rx_blocking(1))]
+fn test_basic_bounded_empty_full_drop_rx<T: AsyncTxTrait<usize>, R: BlockingRxTrait<usize>>(
+    setup_log: (), #[case] channel: (T, R),
+) {
+    let (tx, rx) = channel;
+    assert!(tx.is_empty());
+    assert!(rx.is_empty());
+    tx.try_send(1).expect("Ok");
+    assert!(tx.is_full());
+    assert!(rx.is_full());
+    assert!(!tx.is_empty());
+    assert_eq!(tx.is_disconnected(), false);
+    assert_eq!(rx.is_disconnected(), false);
+    drop(rx);
+    assert_eq!(tx.is_disconnected(), true);
+    assert_eq!(tx.as_ref().get_rx_count(), 0);
+    assert_eq!(tx.as_ref().get_tx_count(), 1);
+}
+
+#[logfn]
+#[rstest]
+#[case(spsc::bounded_tx_async_rx_blocking(1))]
+#[case(mpsc::bounded_tx_async_rx_blocking(1))]
+#[case(mpmc::bounded_tx_async_rx_blocking(1))]
+fn test_basic_bounded_empty_full_drop_tx<T: AsyncTxTrait<usize>, R: BlockingRxTrait<usize>>(
+    setup_log: (), #[case] channel: (T, R),
+) {
+    let (tx, rx) = channel;
+    assert!(tx.is_empty());
+    assert!(rx.is_empty());
+    tx.try_send(1).expect("Ok");
+    assert!(tx.is_full());
+    assert!(rx.is_full());
+    assert!(!tx.is_empty());
+    assert_eq!(tx.is_disconnected(), false);
+    assert_eq!(rx.is_disconnected(), false);
+    drop(tx);
+    assert_eq!(rx.is_disconnected(), true);
+    assert_eq!(rx.as_ref().get_tx_count(), 0);
+    assert_eq!(rx.as_ref().get_rx_count(), 1);
+}
+
+#[logfn]
+#[rstest]
+fn test_basic_compile_bounded_empty_full() {
+    let (tx, rx) = mpmc::bounded_tx_async_rx_blocking::<usize>(1);
+    assert!(tx.is_empty());
+    assert!(rx.is_empty());
+    tx.try_send(1).expect("ok");
+    assert!(tx.is_full());
+    assert!(!tx.is_empty());
+    assert!(rx.is_full());
+    assert_eq!(tx.get_tx_count(), 1);
+    assert_eq!(rx.get_tx_count(), 1);
+    assert_eq!(tx.is_disconnected(), false);
+    assert_eq!(rx.is_disconnected(), false);
+    drop(rx);
+    assert_eq!(tx.is_disconnected(), true);
+}
+
+#[logfn]
+#[rstest]
 #[case(spsc::bounded_tx_async_rx_blocking::<usize>(100))]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(100))]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(100))]

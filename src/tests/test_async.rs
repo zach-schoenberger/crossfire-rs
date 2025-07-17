@@ -15,6 +15,70 @@ fn setup_log() {
 
 #[logfn]
 #[rstest]
+#[case(spsc::bounded_async(1))]
+#[case(mpsc::bounded_async(1))]
+#[case(mpmc::bounded_async(1))]
+fn test_basic_bounded_empty_full_drop_rx<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
+    setup_log: (), #[case] channel: (T, R),
+) {
+    let (tx, rx) = channel;
+    assert!(tx.is_empty());
+    assert!(rx.is_empty());
+    tx.try_send(1).expect("Ok");
+    assert!(tx.is_full());
+    assert!(rx.is_full());
+    assert!(!tx.is_empty());
+    assert_eq!(tx.is_disconnected(), false);
+    assert_eq!(rx.is_disconnected(), false);
+    drop(rx);
+    assert_eq!(tx.is_disconnected(), true);
+    assert_eq!(tx.as_ref().get_rx_count(), 0);
+    assert_eq!(tx.as_ref().get_tx_count(), 1);
+}
+
+#[logfn]
+#[rstest]
+#[case(spsc::bounded_async(1))]
+#[case(mpsc::bounded_async(1))]
+#[case(mpmc::bounded_async(1))]
+fn test_basic_bounded_empty_full_drop_tx<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
+    setup_log: (), #[case] channel: (T, R),
+) {
+    let (tx, rx) = channel;
+    assert!(tx.is_empty());
+    assert!(rx.is_empty());
+    tx.try_send(1).expect("Ok");
+    assert!(tx.is_full());
+    assert!(rx.is_full());
+    assert!(!tx.is_empty());
+    assert_eq!(tx.is_disconnected(), false);
+    assert_eq!(rx.is_disconnected(), false);
+    drop(tx);
+    assert_eq!(rx.is_disconnected(), true);
+    assert_eq!(rx.as_ref().get_tx_count(), 0);
+    assert_eq!(rx.as_ref().get_rx_count(), 1);
+}
+
+#[logfn]
+#[rstest]
+fn test_basic_compile_bounded_empty_full() {
+    let (tx, rx) = mpmc::bounded_async::<usize>(1);
+    assert!(tx.is_empty());
+    assert!(rx.is_empty());
+    tx.try_send(1).expect("ok");
+    assert!(tx.is_full());
+    assert!(!tx.is_empty());
+    assert!(rx.is_full());
+    assert_eq!(tx.get_tx_count(), 1);
+    assert_eq!(rx.get_tx_count(), 1);
+    assert_eq!(tx.is_disconnected(), false);
+    assert_eq!(rx.is_disconnected(), false);
+    drop(rx);
+    assert_eq!(tx.is_disconnected(), true);
+}
+
+#[logfn]
+#[rstest]
 fn test_sync() {
     use futures::FutureExt;
     runtime_block_on!(async move {
@@ -253,7 +317,7 @@ fn test_basic_unbounded_idle_select<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32
                 pin_mut!(f);
                 select! {
                     _ = f => {
-                        let (_tx_wakers, _rx_wakers) = rx.get_waker_size();
+                        let (_tx_wakers, _rx_wakers) = rx.as_ref().get_waker_size();
                         debug!("waker tx {} rx {}", _tx_wakers, _rx_wakers);
                     },
                     _ = c => {
@@ -262,7 +326,7 @@ fn test_basic_unbounded_idle_select<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32
                 }
             }
         }
-        let (tx_wakers, rx_wakers) = rx.get_waker_size();
+        let (tx_wakers, rx_wakers) = rx.as_ref().get_waker_size();
         assert_eq!(tx_wakers, 0);
         info!("waker rx {}", rx_wakers);
     });
@@ -345,14 +409,14 @@ fn test_basic_timeout_recv_async_waker<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32
             for _ in 0..1000 {
                 assert!(tokio::time::timeout(Duration::from_millis(1), rx.recv()).await.is_err());
             }
-            let (tx_wakers, rx_wakers) = rx.get_waker_size();
+            let (tx_wakers, rx_wakers) = rx.as_ref().get_waker_size();
             println!("wakers: {}, {}", tx_wakers, rx_wakers);
             assert!(tx_wakers <= 1);
             assert!(rx_wakers <= 1);
             sleep(Duration::from_secs(1)).await;
             let _ = tx.send(1).await;
             assert_eq!(rx.recv().await.unwrap(), 1);
-            let (tx_wakers, rx_wakers) = rx.get_waker_size();
+            let (tx_wakers, rx_wakers) = rx.as_ref().get_waker_size();
             println!("wakers: {}, {}", tx_wakers, rx_wakers);
             assert!(tx_wakers <= 1);
             assert!(rx_wakers <= 1);
@@ -385,7 +449,7 @@ fn test_basic_unbounded_recv_timeout_async<T: BlockingTxTrait<i32>, R: AsyncRxTr
                 RecvTimeoutError::Timeout
             );
             let _ = th.await;
-            let (tx_wakers, rx_wakers) = rx.get_waker_size();
+            let (tx_wakers, rx_wakers) = rx.as_ref().get_waker_size();
             println!("wakers: {}, {}", tx_wakers, rx_wakers);
             assert_eq!(tx_wakers, 0);
             assert_eq!(rx_wakers, 0);
@@ -444,7 +508,7 @@ fn test_basic_send_timeout_async<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
                     }
                 }
             }
-            let (tx_wakers, rx_wakers) = tx.get_waker_size();
+            let (tx_wakers, rx_wakers) = tx.as_ref().get_waker_size();
             println!("wakers: {}, {}", tx_wakers, rx_wakers);
             assert_eq!(tx_wakers, 0);
             assert_eq!(rx_wakers, 0);
@@ -476,7 +540,7 @@ fn test_pressure_bounded_timeout_async(
                 rx.recv_timeout(Duration::from_millis(1)).await.unwrap_err(),
                 RecvTimeoutError::Timeout
             );
-            let (tx_wakers, rx_wakers) = rx.get_waker_size();
+            let (tx_wakers, rx_wakers) = rx.as_ref().get_waker_size();
             println!("wakers: {}, {}", tx_wakers, rx_wakers);
             assert_eq!(tx_wakers, 0);
             assert_eq!(rx_wakers, 0);
