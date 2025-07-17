@@ -73,7 +73,7 @@
 //! <td align="center"><a href="struct.Tx.html">Tx</a></td>
 //! <td align="center"><a href="struct.MTx.html">MTx</a></td>
 //! <td align="center"><a href="struct.Rx.html">Rx</a></td>
-//! <td align="center"><a href="struct.MRx">MRx</a></td> </tr>
+//! <td align="center"><a href="struct.MRx.html">MRx</a></td> </tr>
 //!
 //! <tr><td rowspan="2"><b>Async</b></td>
 //! <td colspan="2" align="center"><a href="trait.AsyncTxTrait.html">AsyncTxTrait</a></td>
