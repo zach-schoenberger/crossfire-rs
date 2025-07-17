@@ -118,7 +118,7 @@ impl ChannelShared {
     }
 
     /// Just for debugging purpose, to monitor queue size
-    pub fn get_waker_size(&self) -> (usize, usize) {
-        (self.senders.get_size(), self.recvs.get_size())
+    pub fn get_wakers_count(&self) -> (usize, usize) {
+        (self.senders.len(), self.recvs.len())
     }
 }

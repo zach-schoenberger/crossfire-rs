@@ -24,7 +24,7 @@ pub trait RegistryTrait {
     fn close(&self);
 
     /// return waker queue size
-    fn get_size(&self) -> usize;
+    fn len(&self) -> usize;
 }
 
 /// RegistryDummy is for unbounded channel tx, which is never blocked
@@ -57,7 +57,7 @@ impl RegistryTrait for RegistryDummy {
 
     /// return waker queue size
     #[inline(always)]
-    fn get_size(&self) -> usize {
+    fn len(&self) -> usize {
         0
     }
 }
@@ -106,7 +106,7 @@ impl RegistryTrait for RegistrySingle {
 
     /// return waker queue size
     #[inline(always)]
-    fn get_size(&self) -> usize {
+    fn len(&self) -> usize {
         if self.cell.exists() {
             1
         } else {
@@ -181,7 +181,7 @@ impl RegistryTrait for RegistryMulti {
 
     /// return waker queue size
     #[inline(always)]
-    fn get_size(&self) -> usize {
+    fn len(&self) -> usize {
         self.queue.len()
     }
 }

@@ -456,7 +456,7 @@ fn test_pressure_bounded_timeout_blocking(setup_log: (), #[case] _channel: (MTx<
             rx.recv_timeout(Duration::from_millis(1)).unwrap_err(),
             RecvTimeoutError::Timeout
         );
-        let (tx_wakers, rx_wakers) = rx.as_ref().get_waker_size();
+        let (tx_wakers, rx_wakers) = rx.as_ref().get_wakers_count();
         println!("wakers: {}, {}", tx_wakers, rx_wakers);
         assert_eq!(tx_wakers, 0);
         assert_eq!(rx_wakers, 0);
