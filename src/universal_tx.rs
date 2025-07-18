@@ -1,3 +1,6 @@
+#[cfg(any(feature = "tokio", feature = "async_std"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
+use crate::SendTimeoutFuture;
 use crate::{AsyncTxTrait, BlockingTxTrait, ChannelShared, MAsyncTx, SendFuture};
 use crossbeam::channel::{SendError, SendTimeoutError, TrySendError};
 use std::{fmt, time::Duration};
@@ -16,13 +19,13 @@ impl<T: Unpin> Clone for UniversalTx<T> {
 
 impl<T> fmt::Debug for UniversalTx<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "UAsyncTx")
+        write!(f, "UniversalTx")
     }
 }
 
 impl<T> fmt::Display for UniversalTx<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "UAsyncTx")
+        write!(f, "UniversalTx")
     }
 }
 

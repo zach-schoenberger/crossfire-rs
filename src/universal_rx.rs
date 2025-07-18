@@ -1,3 +1,6 @@
+#[cfg(any(feature = "tokio", feature = "async_std"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
+use crate::ReceiveTimeoutFuture;
 use crate::{AsyncRxTrait, BlockingRxTrait, ChannelShared, MAsyncRx, ReceiveFuture};
 use crossbeam::channel::{RecvError, RecvTimeoutError, TryRecvError};
 use std::{fmt, time::Duration};
@@ -10,13 +13,13 @@ pub struct UniversalRx<T>(pub(crate) MAsyncRx<T>);
 
 impl<T> fmt::Debug for UniversalRx<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "UAsyncRx")
+        write!(f, "UniversalRx")
     }
 }
 
 impl<T> fmt::Display for UniversalRx<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "UAsyncRx")
+        write!(f, "UniversalRx")
     }
 }
 
