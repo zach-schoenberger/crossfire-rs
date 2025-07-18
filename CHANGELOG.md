@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [2.0.10] - 2025-07-17
+## [2.0.11] - 2025-07-18
 
 ### Added
 
@@ -23,9 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add is_full(), get_tx_count(), get_rx_count()
 
+- Revert the removal of send_blocking() and recv_blocking() (will maintain through 2.0.x)
+
 ### Removed
 
 - Remove DerefMut because it's no used.
+
+### Fixed
+
+- Fix send_timeout() in blocking context
+
+## [2.0.10] yanked
+
+published with the wrong branch, do not use.
 
 ## [2.0.9] - 2025-07-16
 
