@@ -68,7 +68,9 @@ impl<T> LockedQueue<T> {
     #[inline(always)]
     pub fn push(&self, msg: T) {
         let mut guard = self.queue.lock();
-        let _ = self.empty.compare_exchange_weak(true, false, Ordering::SeqCst, Ordering::Relaxed);
+        if guard.is_empty() {
+            self.empty.store(false, Ordering::Release);
+        }
         guard.push_back(msg);
     }
 
