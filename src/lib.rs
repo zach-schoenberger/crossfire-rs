@@ -219,6 +219,10 @@ pub use async_rx::*;
 
 pub mod sink;
 pub mod stream;
+mod universal_tx;
+pub use universal_tx::*;
+mod universal_rx;
+pub use universal_rx::*;
 
 mod crossbeam;
 pub use crossbeam::err::*;
