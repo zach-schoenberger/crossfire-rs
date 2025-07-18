@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.12] - 2025-07-18
+
+### Fixed
+
+- Fix a possible hang in LockedQueue introduced from v2.0.5
+
 ## [2.0.11] - 2025-07-18
 
 ### Added
