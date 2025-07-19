@@ -1,11 +1,11 @@
 use crate::backoff::Backoff;
-use crate::channel::*;
 use crate::sink::AsyncSink;
+use crate::{channel::*, MTx, Tx};
 use std::cell::Cell;
 use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::mem::{needs_drop, MaybeUninit};
+use std::mem::{needs_drop, ManuallyDrop, MaybeUninit};
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -71,6 +71,19 @@ unsafe impl<T: Send> Send for AsyncTx<T> {}
 impl<T> Drop for AsyncTx<T> {
     fn drop(&mut self) {
         self.shared.close_tx();
+    }
+}
+
+impl<T> TryFrom<Tx<T>> for AsyncTx<T> {
+    type Error = Tx<T>;
+    fn try_from(value: Tx<T>) -> Result<Self, Self::Error> {
+        match &value.shared.senders {
+            Registry::Multi(_) | Registry::Single(_) => {
+                let value = ManuallyDrop::new(value);
+                unsafe { Ok(AsyncTx::new(std::ptr::read(&value.shared))) }
+            }
+            Registry::Dummy(_) => Err(value),
+        }
     }
 }
 
@@ -461,6 +474,18 @@ impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for MAsyncTx<T> {
         &'a self, item: T, duration: std::time::Duration,
     ) -> SendTimeoutFuture<'a, T> {
         self.0.send_timeout(item, duration)
+    }
+}
+
+impl<T> TryFrom<MTx<T>> for MAsyncTx<T> {
+    type Error = MTx<T>;
+    fn try_from(value: MTx<T>) -> Result<Self, Self::Error> {
+        if matches!(value.shared.recvs, Registry::Multi(_)) {
+            let value = ManuallyDrop::new(value);
+            unsafe { Ok(MAsyncTx(AsyncTx::new(std::ptr::read(&value.shared)))) }
+        } else {
+            Err(value)
+        }
     }
 }
 
