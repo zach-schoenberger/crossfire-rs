@@ -1,4 +1,4 @@
-use crate::channel::*;
+use crate::{channel::*, AsyncTx, MAsyncTx};
 use crossbeam::channel::Sender;
 use std::cell::Cell;
 use std::fmt;
@@ -64,6 +64,13 @@ impl<T> fmt::Display for Tx<T> {
 impl<T> Drop for Tx<T> {
     fn drop(&mut self) {
         self.shared.close_tx();
+    }
+}
+
+impl<T> From<AsyncTx<T>> for Tx<T> {
+    fn from(value: AsyncTx<T>) -> Self {
+        value.add_tx();
+        Self::new(value.sender.clone(), value.shared.clone())
     }
 }
 
@@ -165,6 +172,13 @@ impl<T> fmt::Debug for MTx<T> {
 impl<T> fmt::Display for MTx<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MTx")
+    }
+}
+
+impl<T> From<MAsyncTx<T>> for MTx<T> {
+    fn from(value: MAsyncTx<T>) -> Self {
+        value.add_tx();
+        Self::new(value.sender.clone(), value.shared.clone())
     }
 }
 

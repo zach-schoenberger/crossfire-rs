@@ -1,4 +1,4 @@
-use crate::channel::*;
+use crate::{channel::*, AsyncRx, MAsyncRx};
 use crossbeam::channel::Receiver;
 use std::cell::Cell;
 use std::fmt;
@@ -64,6 +64,13 @@ impl<T> fmt::Display for Rx<T> {
 impl<T> Drop for Rx<T> {
     fn drop(&mut self) {
         self.shared.close_rx();
+    }
+}
+
+impl<T> From<AsyncRx<T>> for Rx<T> {
+    fn from(value: AsyncRx<T>) -> Self {
+        value.add_rx();
+        Self::new(value.recv.clone(), value.shared.clone())
     }
 }
 
@@ -198,6 +205,13 @@ impl<T> Deref for MRx<T> {
 impl<T> From<MRx<T>> for Rx<T> {
     fn from(rx: MRx<T>) -> Self {
         rx.0
+    }
+}
+
+impl<T> From<MAsyncRx<T>> for MRx<T> {
+    fn from(value: MAsyncRx<T>) -> Self {
+        value.add_rx();
+        Self::new(value.recv.clone(), value.shared.clone())
     }
 }
 
