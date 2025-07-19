@@ -1,11 +1,10 @@
 use crate::backoff::Backoff;
+use crate::channel::*;
 use crate::stream::AsyncStream;
-use crate::{channel::*, MRx, Rx};
 use std::cell::Cell;
 use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::mem::ManuallyDrop;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -71,19 +70,6 @@ impl<T> fmt::Display for AsyncRx<T> {
 impl<T> Drop for AsyncRx<T> {
     fn drop(&mut self) {
         self.shared.close_rx();
-    }
-}
-
-impl<T> TryFrom<Rx<T>> for AsyncRx<T> {
-    type Error = Rx<T>;
-    fn try_from(value: Rx<T>) -> Result<Self, Self::Error> {
-        match &value.shared.recvs {
-            Registry::Multi(_) | Registry::Single(_) => {
-                let value = ManuallyDrop::new(value);
-                unsafe { Ok(AsyncRx::new(std::ptr::read(&value.shared))) }
-            }
-            Registry::Dummy(_) => Err(value),
-        }
     }
 }
 
@@ -423,18 +409,6 @@ impl<T> Clone for MAsyncRx<T> {
 impl<T> From<MAsyncRx<T>> for AsyncRx<T> {
     fn from(rx: MAsyncRx<T>) -> Self {
         rx.0
-    }
-}
-
-impl<T> TryFrom<MRx<T>> for MAsyncRx<T> {
-    type Error = MRx<T>;
-    fn try_from(value: MRx<T>) -> Result<Self, Self::Error> {
-        if matches!(value.shared.recvs, Registry::Multi(_)) {
-            let value = ManuallyDrop::new(value);
-            unsafe { Ok(MAsyncRx(AsyncRx::new(std::ptr::read(&value.shared)))) }
-        } else {
-            Err(value)
-        }
     }
 }
 
