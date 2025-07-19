@@ -3,7 +3,7 @@ use crate::{channel::*, tx_stats, AsyncTx, MAsyncTx};
 use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
-use std::mem::{ManuallyDrop, MaybeUninit};
+use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -70,8 +70,8 @@ impl<T> Drop for Tx<T> {
 
 impl<T> From<AsyncTx<T>> for Tx<T> {
     fn from(value: AsyncTx<T>) -> Self {
-        let value = ManuallyDrop::new(value);
-        unsafe { Self::new(std::ptr::read(&value.shared)) }
+        value.add_tx();
+        Self::new(value.shared.clone())
     }
 }
 
@@ -257,8 +257,8 @@ impl<T> fmt::Display for MTx<T> {
 
 impl<T> From<MAsyncTx<T>> for MTx<T> {
     fn from(value: MAsyncTx<T>) -> Self {
-        let value = ManuallyDrop::new(value);
-        unsafe { Self::new(std::ptr::read(&value.shared)) }
+        value.add_tx();
+        Self::new(value.shared.clone())
     }
 }
 

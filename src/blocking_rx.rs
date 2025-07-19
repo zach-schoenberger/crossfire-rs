@@ -3,7 +3,6 @@ use crate::{channel::*, rx_stats, AsyncRx, MAsyncRx};
 use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
-use std::mem::ManuallyDrop;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -70,8 +69,8 @@ impl<T> Drop for Rx<T> {
 
 impl<T> From<AsyncRx<T>> for Rx<T> {
     fn from(value: AsyncRx<T>) -> Self {
-        let value = ManuallyDrop::new(value);
-        unsafe { Self::new(std::ptr::read(&value.shared)) }
+        value.add_rx();
+        Self::new(value.shared.clone())
     }
 }
 
@@ -263,8 +262,8 @@ impl<T> From<MRx<T>> for Rx<T> {
 
 impl<T> From<MAsyncRx<T>> for MRx<T> {
     fn from(value: MAsyncRx<T>) -> Self {
-        let value = ManuallyDrop::new(value);
-        unsafe { Self::new(std::ptr::read(&value.shared)) }
+        value.add_rx();
+        Self::new(value.shared.clone())
     }
 }
 
