@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.13] - 2025-07-24
+
+### Fixed
+
+- Fix a deadlock https://github.com/frostyplanet/crossfire-rs/issues/22
+
+### Added
+
+- Allow type conversion from AsyncTx -> Tx, AsyncRx -> Rx
+
 ## [2.0.12] - 2025-07-18
 
 ### Fixed
