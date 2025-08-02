@@ -17,6 +17,11 @@ const BACKOFF_LIMIT: usize = 6;
 ///
 /// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
 ///
+/// `AsyncRx` can be converted into `Rx` via `From` trait,
+/// that means you can have two types of receivers both within async and
+/// blocking context for the same channel.
+
+///
 /// **NOTE: AsyncRx is not Clone, nor Sync.**
 /// If you need concurrent access, use [MAsyncRx](crate::MAsyncRx) instead.
 ///
@@ -434,6 +439,11 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
 /// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
 ///
 /// You can use `into()` to convert it to `AsyncRx<T>`.
+///
+/// `MAsyncRx` can be converted into `MRx` via `From` trait,
+/// that means you can have two types of receivers both within async and
+/// blocking context for the same channel.
+
 pub struct MAsyncRx<T>(pub(crate) AsyncRx<T>);
 
 impl<T> fmt::Debug for MAsyncRx<T> {
