@@ -1,6 +1,7 @@
 use crate::channel::*;
 use crate::stream::AsyncStream;
 use crossbeam::channel::Receiver;
+use crossbeam::utils::Backoff;
 use std::cell::Cell;
 use std::fmt;
 use std::future::Future;
@@ -9,6 +10,8 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+
+const BACKOFF_LIMIT: usize = 6;
 
 /// Single consumer (receiver) that works in async context.
 ///
@@ -48,6 +51,7 @@ use std::task::{Context, Poll};
 /// }
 /// ```
 pub struct AsyncRx<T> {
+    bound_size: usize,
     pub(crate) recv: Receiver<T>,
     pub(crate) shared: Arc<ChannelShared>,
     // Remove the Sync marker to prevent being put in Arc
@@ -77,7 +81,8 @@ impl<T> Drop for AsyncRx<T> {
 impl<T> AsyncRx<T> {
     #[inline]
     pub(crate) fn new(recv: Receiver<T>, shared: Arc<ChannelShared>) -> Self {
-        Self { recv, shared, _phan: Default::default() }
+        let bound_size = recv.capacity().unwrap_or(0);
+        Self { bound_size, recv, shared, _phan: Default::default() }
     }
 
     /// Receive message, will await when channel is empty.
@@ -177,14 +182,19 @@ impl<T> AsyncRx<T> {
         // When the result is not TryRecvError::Empty,
         // make sure always take the o_waker out and abandon,
         // to skip the timeout cleaning logic in Drop.
-        let r = self.try_recv();
-        if let Some(old_waker) = o_waker.take() {
-            // https://github.com/frostyplanet/crossfire-rs/issues/14
-            old_waker.cancel();
-        }
-        if let Err(TryRecvError::Empty) = &r {
-        } else {
-            return r;
+        let backoff = Backoff::new();
+        let limit = if self.bound_size == 1 { BACKOFF_LIMIT } else { 1 };
+        for _ in 0..limit {
+            let r = self.try_recv();
+            if let Some(old_waker) = o_waker.take() {
+                // https://github.com/frostyplanet/crossfire-rs/issues/14
+                old_waker.cancel();
+            }
+            if let Err(TryRecvError::Empty) = &r {
+            } else {
+                return r;
+            }
+            backoff.snooze();
         }
         let waker = self.shared.reg_recv_async(ctx);
         // NOTE: The other side put something whie reg_send and did not see the waker,
