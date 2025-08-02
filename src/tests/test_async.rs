@@ -6,6 +6,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+use std::thread;
 use std::time::Duration;
 
 #[fixture]
@@ -804,5 +805,76 @@ fn test_pressure_bounded_async_multi(
             let _ = th.await;
         }
         assert_eq!(counter.as_ref().load(Ordering::Acquire), round * tx_count);
+    });
+}
+
+#[logfn]
+#[rstest]
+#[case(mpmc::bounded_async::<usize>(1))]
+#[case(mpmc::bounded_async::<usize>(10))]
+#[case(mpmc::bounded_async::<usize>(100))]
+fn test_pressure_bounded_mixed_async_blocking_conversion(
+    setup_log: (), #[case] channel: (MAsyncTx<usize>, MAsyncRx<usize>),
+) {
+    let (tx, rx) = channel;
+    runtime_block_on!(async move {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let round: usize = 10000;
+        let mut th_s = Vec::new();
+        let mut co_s = Vec::new();
+        let _tx: MTx<usize> = tx.clone().into();
+        th_s.push(thread::spawn(move || {
+            for i in 0..round {
+                match _tx.send(i) {
+                    Err(e) => panic!("{:?}", e),
+                    _ => {}
+                }
+            }
+            debug!("tx blocking exit");
+        }));
+        co_s.push(async_spawn!(async move {
+            for i in 0..round {
+                match tx.send(i).await {
+                    Err(e) => panic!("{:?}", e),
+                    _ => {}
+                }
+            }
+            debug!("tx async exit");
+        }));
+        let _rx: MRx<usize> = rx.clone().into();
+        let _counter = counter.clone();
+        th_s.push(thread::spawn(move || {
+            'A: loop {
+                match _rx.recv() {
+                    Ok(_i) => {
+                        _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                        debug!("recv blocking {}", _i);
+                    }
+                    Err(_) => break 'A,
+                }
+            }
+            debug!("rx blocking exit");
+        }));
+
+        let _counter = counter.clone();
+        co_s.push(async_spawn!(async move {
+            'A: loop {
+                match rx.recv().await {
+                    Ok(_i) => {
+                        _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                        debug!("recv async {}", _i);
+                    }
+                    Err(_) => break 'A,
+                }
+            }
+            debug!("rx async exit");
+        }));
+        for th in co_s {
+            let _ = th.await;
+        }
+        for th in th_s {
+            let _ = th.join();
+        }
+        assert_eq!(counter.as_ref().load(Ordering::Acquire), round * 2);
     });
 }
