@@ -31,8 +31,7 @@ version until long run tests prove to be stable.
 
 ## Performance
 
-We focus on optimization of async logic, outperforming other async capability channels
-(flume, tokio::mpsc, etc) in most cases.
+We focus on optimization of async logic, outperforming other async capability channels in most cases.
 
 Due to context switching between sleep and wake, there is a certain
 overhead on async context over crossbeam-channel which in blocking context.
@@ -43,11 +42,13 @@ Benchmark is written in criterion framework. You can run benchmark by:
 cargo bench --bench crossfire
 ```
 
-More benchmark data is on [wiki](https://github.com/frostyplanet/crossfire-rs/wiki). Here are some of the results:
+More benchmark data is on [wiki](https://github.com/frostyplanet/crossfire-rs/wiki/benchmark-v2.0.14-2025%E2%80%9008%E2%80%9003). Here are some of the results:
 
-<img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2025-06-27/mpmc_bound_size_100_async.png" alt="mpmc bounded size 100 async context">
+<img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2.0.14-2025-08-03/mpsc_size_100_async.png" alt="mpsc bounded size 100 async context">
 
-<img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2025-06-27/mpsc_unbounded_async.png" alt="mpsc unbounded async context">
+<img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2.0.14-2025-08-03/mpmc_size_100_async.png" alt="mpmc bounded size 100 async context">
+
+<img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2.0.14-2025-08-03/mpmc_unbounded_async.png" alt="mpmc unbounded async context">
 
 
 ## APIs

@@ -35,7 +35,9 @@
 //! cargo bench --bench crossfire
 //! ```
 //!
-//! Some benchmark data is posted on [wiki](https://github.com/frostyplanet/crossfire-rs/wiki).
+//! Some benchmark data is posted on [wiki](https://github.com/frostyplanet/crossfire-rs/wiki/benchmark-v2.0.14-2025%E2%80%9008%E2%80%9003).
+//!
+//! <img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2.0.14-2025-08-03/mpsc_size_100_async.png" alt="mpsc bounded size 100 async context">
 //!
 //! ## APIs
 //!
