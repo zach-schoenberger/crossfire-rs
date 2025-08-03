@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.15] - 2025-08-04
+
+## Added
+
+- Add missing conversion: MAsyncTx->AsyncTx and MTx->Tx
+
 ## [2.0.14] - 2025-08-03
 
 ### Changed
