@@ -878,3 +878,15 @@ fn test_pressure_bounded_mixed_async_blocking_conversion(
         assert_eq!(counter.as_ref().load(Ordering::Acquire), round * 2);
     });
 }
+
+#[test]
+fn test_conversion() {
+    use crate::stream::AsyncStream;
+    let (mtx, mrx) = mpmc::bounded_async(1);
+    let _tx: AsyncTx<usize> = mtx.into();
+    let _rx: AsyncRx<usize> = mrx.into();
+    let (_mtx, rx) = mpsc::bounded_async(1);
+    let _stream: AsyncStream<usize> = rx.into(); // AsyncRx -> AsyncStream
+    let (_mtx, mrx) = mpmc::bounded_async(1);
+    let _stream: AsyncStream<usize> = mrx.into(); // AsyncRx -> AsyncStream
+}

@@ -1,6 +1,6 @@
-use crate::async_tx::AsyncTx;
 use crate::locked_waker::LockedWaker;
 use crate::TrySendError;
+use crate::{AsyncTx, MAsyncTx};
 use std::fmt;
 use std::ops::Deref;
 use std::task::Context;
@@ -36,6 +36,20 @@ impl<T> Deref for AsyncSink<T> {
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.tx
+    }
+}
+
+impl<T: Unpin + Send + 'static> From<AsyncTx<T>> for AsyncSink<T> {
+    #[inline]
+    fn from(tx: AsyncTx<T>) -> Self {
+        tx.into_sink()
+    }
+}
+
+impl<T: Unpin + Send + 'static> From<MAsyncTx<T>> for AsyncSink<T> {
+    #[inline]
+    fn from(tx: MAsyncTx<T>) -> Self {
+        tx.into_sink()
     }
 }
 

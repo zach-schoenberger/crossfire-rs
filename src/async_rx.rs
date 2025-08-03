@@ -1,5 +1,5 @@
-use crate::channel::*;
 use crate::stream::AsyncStream;
+use crate::{channel::*, MRx, Rx};
 use crossbeam::channel::Receiver;
 use crossbeam::utils::Backoff;
 use std::cell::Cell;
@@ -221,11 +221,17 @@ impl<T> AsyncRx<T> {
         return r;
     }
 
+    #[inline]
     pub fn into_stream(self) -> AsyncStream<T>
     where
         T: Send + Unpin + 'static,
     {
         AsyncStream::new(self)
+    }
+
+    #[inline]
+    pub fn into_blocking(self) -> Rx<T> {
+        self.into()
     }
 
     /// Receive a message while **blocking the current thread**. Be careful!
@@ -487,6 +493,11 @@ impl<T> MAsyncRx<T> {
         T: Send + Unpin + 'static,
     {
         AsyncStream::new(self.0)
+    }
+
+    #[inline]
+    pub fn into_blocking(self) -> MRx<T> {
+        self.into()
     }
 }
 

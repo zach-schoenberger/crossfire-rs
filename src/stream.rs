@@ -1,5 +1,5 @@
 use crate::locked_waker::LockedWaker;
-use crate::AsyncRx;
+use crate::{AsyncRx, MAsyncRx};
 use futures::stream;
 use std::fmt;
 use std::ops::Deref;
@@ -98,6 +98,20 @@ impl<T> Drop for AsyncStream<T> {
         if let Some(waker) = self.waker.take() {
             self.rx.shared.clear_recv_wakers(waker.get_seq());
         }
+    }
+}
+
+impl<T: Unpin + Send + 'static> From<AsyncRx<T>> for AsyncStream<T> {
+    #[inline]
+    fn from(rx: AsyncRx<T>) -> Self {
+        rx.into_stream()
+    }
+}
+
+impl<T: Unpin + Send + 'static> From<MAsyncRx<T>> for AsyncStream<T> {
+    #[inline]
+    fn from(rx: MAsyncRx<T>) -> Self {
+        rx.into_stream()
     }
 }
 

@@ -551,3 +551,10 @@ fn test_pressure_bounded_timeout_blocking(setup_log: (), #[case] _channel: (MTx<
         println!("recv timeout count: {}", recv_timeout_counter.load(Ordering::Acquire));
     }
 }
+
+#[test]
+fn test_conversion() {
+    let (mtx, mrx) = mpmc::bounded_blocking::<usize>(1);
+    let _tx: Tx<usize> = mtx.into();
+    let _rx: Rx<usize> = mrx.into();
+}

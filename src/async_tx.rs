@@ -1,5 +1,5 @@
-use crate::channel::*;
 use crate::sink::AsyncSink;
+use crate::{channel::*, MTx, Tx};
 use crossbeam::channel::Sender;
 use crossbeam::utils::Backoff;
 use std::cell::Cell;
@@ -128,6 +128,11 @@ impl<T> AsyncTx<T> {
     #[inline]
     pub fn into_sink(self) -> AsyncSink<T> {
         AsyncSink::new(self)
+    }
+
+    #[inline]
+    pub fn into_blocking(self) -> Tx<T> {
+        self.into()
     }
 }
 
@@ -489,6 +494,16 @@ impl<T> MAsyncTx<T> {
     #[inline]
     pub(crate) fn new(send: Sender<T>, shared: Arc<ChannelShared>) -> Self {
         Self(AsyncTx::new(send, shared))
+    }
+
+    #[inline]
+    pub fn into_sink(self) -> AsyncSink<T> {
+        AsyncSink::new(self.0)
+    }
+
+    #[inline]
+    pub fn into_blocking(self) -> MTx<T> {
+        self.into()
     }
 }
 
