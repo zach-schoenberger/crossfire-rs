@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.16] - 2025-08-04
+
+## Added
+
+- Add into_blocking()
+
+- Add missing into_sink() for MAsyncTx.
+
+- Add From for AsyncSink and AsyncStream.
+
 ## [2.0.15] - 2025-08-04
 
 ## Added
