@@ -479,6 +479,12 @@ impl<T: Unpin> Clone for MAsyncTx<T> {
     }
 }
 
+impl<T> From<MAsyncTx<T>> for AsyncTx<T> {
+    fn from(tx: MAsyncTx<T>) -> Self {
+        tx.0
+    }
+}
+
 impl<T> MAsyncTx<T> {
     #[inline]
     pub(crate) fn new(send: Sender<T>, shared: Arc<ChannelShared>) -> Self {

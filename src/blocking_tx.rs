@@ -175,6 +175,12 @@ impl<T> fmt::Display for MTx<T> {
     }
 }
 
+impl<T> From<MTx<T>> for Tx<T> {
+    fn from(tx: MTx<T>) -> Self {
+        tx.0
+    }
+}
+
 impl<T> From<MAsyncTx<T>> for MTx<T> {
     fn from(value: MAsyncTx<T>) -> Self {
         value.add_tx();
