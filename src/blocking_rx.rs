@@ -197,6 +197,7 @@ impl<T> Deref for MRx<T> {
     type Target = Rx<T>;
 
     /// inherit all the functions of [Rx]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -328,18 +329,21 @@ impl<T: Send + 'static> BlockingRxTrait<T> for MRx<T> {
 impl<T> Deref for Rx<T> {
     type Target = ChannelShared;
 
+    #[inline(always)]
     fn deref(&self) -> &ChannelShared {
         &self.shared
     }
 }
 
 impl<T> AsRef<ChannelShared> for Rx<T> {
+    #[inline(always)]
     fn as_ref(&self) -> &ChannelShared {
         &self.shared
     }
 }
 
 impl<T> AsRef<ChannelShared> for MRx<T> {
+    #[inline(always)]
     fn as_ref(&self) -> &ChannelShared {
         &self.0.shared
     }

@@ -3,7 +3,7 @@ use crossbeam::channel::Sender;
 use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -210,15 +210,9 @@ impl<T> Deref for MTx<T> {
     type Target = Tx<T>;
 
     /// inherit all the functions of [Tx]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-impl<T> DerefMut for MTx<T> {
-    /// inherit all the functions of [Tx]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
@@ -334,18 +328,21 @@ impl<T: Send + 'static> BlockingTxTrait<T> for MTx<T> {
 
 impl<T> Deref for Tx<T> {
     type Target = ChannelShared;
+    #[inline(always)]
     fn deref(&self) -> &ChannelShared {
         &self.shared
     }
 }
 
 impl<T> AsRef<ChannelShared> for Tx<T> {
+    #[inline(always)]
     fn as_ref(&self) -> &ChannelShared {
         &self.shared
     }
 }
 
 impl<T> AsRef<ChannelShared> for MTx<T> {
+    #[inline(always)]
     fn as_ref(&self) -> &ChannelShared {
         &self.0.shared
     }

@@ -511,6 +511,7 @@ impl<T> Deref for MAsyncTx<T> {
     type Target = AsyncTx<T>;
 
     /// inherit all the functions of [AsyncTx]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -554,18 +555,21 @@ impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for MAsyncTx<T> {
 
 impl<T> Deref for AsyncTx<T> {
     type Target = ChannelShared;
+    #[inline(always)]
     fn deref(&self) -> &ChannelShared {
         &self.shared
     }
 }
 
 impl<T> AsRef<ChannelShared> for AsyncTx<T> {
+    #[inline(always)]
     fn as_ref(&self) -> &ChannelShared {
         &self.shared
     }
 }
 
 impl<T> AsRef<ChannelShared> for MAsyncTx<T> {
+    #[inline(always)]
     fn as_ref(&self) -> &ChannelShared {
         &self.0.shared
     }
