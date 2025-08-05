@@ -260,7 +260,7 @@ fn bench_crossfire_bounded_1_blocking_mpsc(c: &mut Criterion) {
 }
 
 fn bench_crossfire_bounded_1_blocking_mpmc(c: &mut Criterion) {
-    let mut group = c.benchmark_group("crossfire_bounded_100_blocking_n_n");
+    let mut group = c.benchmark_group("crossfire_bounded_1_blocking_n_n");
     group.significance_level(0.1).sample_size(100);
     group.measurement_time(Duration::from_secs(20));
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
