@@ -230,7 +230,7 @@ impl<T> Future for ReceiveFuture<'_, T> {
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
         let mut _self = self.get_mut();
-        match AsyncRx::poll_item(&_self.shared, ctx, &mut _self.waker) {
+        match AsyncRx::poll_item(_self.shared, ctx, &mut _self.waker) {
             Err(e) => {
                 if !e.is_empty() {
                     let _ = _self.waker.take();

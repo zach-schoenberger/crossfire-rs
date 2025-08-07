@@ -1,7 +1,6 @@
 use crate::collections::{ArcCell, WeakCell};
 use std::cell::UnsafeCell;
 use std::fmt;
-use std::mem::transmute;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc, Weak,
@@ -108,15 +107,14 @@ impl fmt::Debug for LockedWakerRef {
 
 impl LockedWakerInner {
     /// return true on suc wake up, false when already woken up.
-
     #[inline(always)]
     fn get_waker(&self) -> &WakerType {
-        unsafe { transmute(self.waker.get()) }
+        unsafe { &*self.waker.get() }
     }
 
     #[inline(always)]
     fn get_waker_mut(&self) -> &mut WakerType {
-        unsafe { transmute(self.waker.get()) }
+        unsafe { &mut *self.waker.get() }
     }
 
     #[inline(always)]

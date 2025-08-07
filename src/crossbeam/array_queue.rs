@@ -186,7 +186,7 @@ impl<T> ArrayQueue<T> {
                     Ok(_) => {
                         // Write the value into the slot and update the stamp.
                         unsafe {
-                            let item: &mut MaybeUninit<T> = mem::transmute(slot.value.get());
+                            let item: &mut MaybeUninit<T> = &mut *slot.value.get();
                             item.write(value.assume_init_read());
                         }
                         slot.stamp.store(tail + 1, Ordering::Release);
@@ -232,7 +232,7 @@ impl<T> ArrayQueue<T> {
     /// }
     /// ```
     pub unsafe fn push_uninit_ref(&self, value: &MaybeUninit<T>) -> Result<(), ()> {
-        self.push_or_else(&value, |tail, _, _| {
+        self.push_or_else(value, |tail, _, _| {
             let head = self.head.load(Ordering::Relaxed);
 
             // If the head lags one lap behind the tail as well...
@@ -305,7 +305,7 @@ impl<T> ArrayQueue<T> {
             {
                 // Move the tail.
                 self.tail.store(new_tail, Ordering::SeqCst);
-                let item: &mut MaybeUninit<T> = unsafe { mem::transmute(slot.value.get()) };
+                let item: &mut MaybeUninit<T> = unsafe { &mut *slot.value.get() };
                 let old = unsafe { item.assume_init_read() };
                 unsafe { item.write(value.assume_init_read()) };
 
