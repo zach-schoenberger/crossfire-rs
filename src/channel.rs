@@ -71,16 +71,66 @@ impl ChannelShared {
         }
     }
 
-    /// Register waker for current rx
+    /// Register waker for current rx, return false when it's a waker not woken up
     #[inline(always)]
-    pub(crate) fn reg_recv_async(&self, ctx: &mut Context) -> LockedWaker {
-        self.recvs.reg_async(ctx)
+    pub(crate) fn reg_recv_async(
+        &self, ctx: &mut Context, o_waker: &mut Option<LockedWaker>,
+    ) -> bool {
+        let _waker = if let Some(waker) = o_waker.as_ref() {
+            let state = waker.get_state();
+            if state == WakerState::WAITING as u8 {
+                // which is not woken, can be reuse.
+                // https://github.com/frostyplanet/crossfire-rs/issues/14
+                if waker.will_wake(ctx) {
+                    return false;
+                } else {
+                    self.recvs.cancel_waker(waker);
+                    LockedWaker::new(ctx)
+                }
+            } else if state != WakerState::WAKED as u8 {
+                // not possible
+                LockedWaker::new(ctx)
+            } else {
+                waker.reset_init();
+                o_waker.take().unwrap()
+            }
+        } else {
+            LockedWaker::new(ctx)
+        };
+        self.recvs.reg_waker(&_waker);
+        o_waker.replace(_waker);
+        true
     }
 
-    /// Register waker for current tx
+    /// Register waker for current tx, return false when it's a waker not woken up
     #[inline(always)]
-    pub(crate) fn reg_send_async(&self, ctx: &mut Context) -> LockedWaker {
-        self.senders.reg_async(ctx)
+    pub(crate) fn reg_send_async(
+        &self, ctx: &mut Context, o_waker: &mut Option<LockedWaker>,
+    ) -> bool {
+        let _waker = if let Some(waker) = o_waker.as_ref() {
+            let state = waker.get_state();
+            if state == WakerState::WAITING as u8 {
+                // which is not woken, can be reuse.
+                // https://github.com/frostyplanet/crossfire-rs/issues/14
+                if waker.will_wake(ctx) {
+                    return false;
+                } else {
+                    self.senders.cancel_waker(waker);
+                    LockedWaker::new(ctx)
+                }
+            } else if state != WakerState::WAKED as u8 {
+                // not possible
+                LockedWaker::new(ctx)
+            } else {
+                waker.reset_init();
+                o_waker.take().unwrap()
+            }
+        } else {
+            LockedWaker::new(ctx)
+        };
+        self.senders.reg_waker(&_waker);
+        o_waker.replace(_waker);
+        true
     }
 
     /// Wake up one rx
