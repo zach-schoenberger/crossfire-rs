@@ -127,9 +127,6 @@
 //! might trigger immediate cleanup if non-conflict conditions are met.
 //! Otherwise will rely on lazy cleanup. (waker will be consumed by actual message send and recv).
 //!
-//! Never the less, for close notification without sending anything, crossfire::mpmc can be heavy
-//! and I suggest that use `tokio::sync::oneshot` instead.
-//!
 //! ## Usage
 //!
 //! Cargo.toml:
