@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.17] - 2025-08-08
+
+## Fixed
+
+- Reuse and cleanup waker as much as possible (for idle select scenario)
+
+- Change some atomic store ordering from Release to SeqCst to avoid further trouble.
+
 ## [2.0.16] - 2025-08-04
 
 ## Added
