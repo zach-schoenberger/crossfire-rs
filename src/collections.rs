@@ -32,7 +32,7 @@ impl<T> WeakCell<T> {
 
     #[inline(always)]
     pub fn pop(&self) -> Option<Arc<T>> {
-        if self.ptr.load(Ordering::Acquire) == ptr::null_mut() {
+        if self.ptr.load(Ordering::SeqCst) == ptr::null_mut() {
             return None;
         }
         let ptr = self.ptr.swap(ptr::null_mut(), Ordering::SeqCst);
@@ -82,7 +82,7 @@ impl<T> LockedQueue<T> {
 
     #[inline(always)]
     pub fn pop(&self) -> Option<T> {
-        if self.empty.load(Ordering::Acquire) {
+        if self.empty.load(Ordering::SeqCst) {
             return None;
         }
         let mut guard = self.queue.lock();
