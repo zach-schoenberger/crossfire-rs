@@ -201,29 +201,34 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
         // crossbeam-channel will check disconnected for us (if not raced)
         let backoff = Backoff::new();
         let limit = if self.bound_size == 1 { BACKOFF_LIMIT } else { 1 };
-        for _ in 0..limit {
-            let r = self.try_send(item);
-            if let Err(TrySendError::Full(t)) = r {
-                item = t;
-            } else {
-                let _ = o_waker.take();
-                return r;
-            }
-            backoff.snooze();
-        }
-        if self.shared.reg_send_async(ctx, o_waker) {
-            // NOTE: The other side put something whie reg_send and did not see the waker,
-            // should check the channel again, otherwise might incur a dead lock.
-            let r = self.try_send(item);
-            if let Err(TrySendError::Full(t)) = r {
-                item = t;
-                if let Some(waker) = o_waker.as_ref() {
-                    waker.commit();
+        loop {
+            for _ in 0..limit {
+                let r = self.try_send(item);
+                if let Err(TrySendError::Full(t)) = r {
+                    item = t;
+                } else {
+                    let _ = o_waker.take();
+                    return r;
                 }
-            } else {
-                let _ = o_waker.take();
-                return r;
+                backoff.snooze();
             }
+            if self.shared.reg_send_async(ctx, o_waker) {
+                // NOTE: The other side put something whie reg_send and did not see the waker,
+                // should check the channel again, otherwise might incur a dead lock.
+                if self.sender.is_full() {
+                    if let Some(waker) = o_waker.as_ref() {
+                        waker.commit();
+                    } else {
+                        unreachable!();
+                    }
+                } else {
+                    if let Some(waker) = o_waker.take() {
+                        self.shared.senders.cancel_waker(&waker);
+                    }
+                    continue;
+                }
+            }
+            break;
         }
         if self.shared.is_disconnected() {
             let _ = o_waker.take();

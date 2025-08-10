@@ -82,7 +82,7 @@ impl RegistryTrait for RegistrySingle {
     #[inline(always)]
     fn cancel_waker(&self, _waker: &LockedWaker) {
         // Got to be it, because only one single thread.
-        // It's ok to ignore it.
+        // It's ok to ignore it, next time will be overwritten.
     }
 
     #[inline(always)]

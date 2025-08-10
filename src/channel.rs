@@ -9,8 +9,8 @@ use std::task::Context;
 pub struct ChannelShared {
     tx_count: AtomicU64,
     rx_count: AtomicU64,
-    recvs: Registry,
-    senders: Registry,
+    pub(crate) senders: Registry,
+    pub(crate) recvs: Registry,
     closed: AtomicBool,
 }
 

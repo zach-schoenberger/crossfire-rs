@@ -189,27 +189,33 @@ impl<T> AsyncRx<T> {
         // to skip the timeout cleaning logic in Drop.
         let backoff = Backoff::new();
         let limit = if self.bound_size == 1 { BACKOFF_LIMIT } else { 1 };
-        for _ in 0..limit {
-            let r = self.try_recv();
-            if let Err(TryRecvError::Empty) = &r {
-            } else {
-                let _ = o_waker.take();
-                return r;
-            }
-            backoff.snooze();
-        }
-        if self.shared.reg_recv_async(ctx, o_waker) {
-            // NOTE: The other side put something whie reg_send and did not see the waker,
-            // should check the channel again, otherwise might incur a dead lock.
-            let r = self.try_recv();
-            if let Err(TryRecvError::Empty) = &r {
-                if let Some(waker) = o_waker.as_ref() {
-                    waker.commit();
+        loop {
+            for _ in 0..limit {
+                let r = self.try_recv();
+                if let Err(TryRecvError::Empty) = &r {
+                } else {
+                    let _ = o_waker.take();
+                    return r;
                 }
-            } else {
-                let _ = o_waker.take();
-                return r;
+                backoff.snooze();
             }
+            if self.shared.reg_recv_async(ctx, o_waker) {
+                // NOTE: The other side put something whie reg_send and did not see the waker,
+                // should check the channel again, otherwise might incur a dead lock.
+                if self.recv.is_empty() {
+                    if let Some(waker) = o_waker.as_ref() {
+                        waker.commit();
+                    } else {
+                        unreachable!();
+                    }
+                } else {
+                    if let Some(waker) = o_waker.take() {
+                        self.shared.recvs.cancel_waker(&waker);
+                    }
+                    continue;
+                }
+            }
+            break;
         }
         // Check channel close before sleep, otherwise might block forever
         // Confirmed by test_pressure_1_tx_blocking_1_rx_async()
