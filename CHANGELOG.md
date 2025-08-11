@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.18] - 2025-08-11
+
+- Change some atomic load ordering from Acquire to SeqCst to pass validation by Miri.
+
 ## [2.0.17] - 2025-08-08
 
 ## Fixed
