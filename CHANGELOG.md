@@ -15,13 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.19] - 2025-08-13
+
+### Added
+
+- Add capacity()
+
 ## [2.0.18] - 2025-08-11
+
+### Fixed
 
 - Change some atomic load ordering from Acquire to SeqCst to pass validation by Miri.
 
 ## [2.0.17] - 2025-08-08
 
-## Fixed
+### Fixed
 
 - Reuse and cleanup waker as much as possible (for idle select scenario)
 
@@ -29,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.16] - 2025-08-04
 
-## Added
+### Added
 
 - Add into_blocking()
 
@@ -39,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.15] - 2025-08-04
 
-## Added
+### Added
 
 - Add missing conversion: MAsyncTx->AsyncTx and MTx->Tx
 
