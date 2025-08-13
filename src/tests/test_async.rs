@@ -26,6 +26,8 @@ fn test_basic_bounded_empty_full_drop_rx<T: AsyncTxTrait<usize>, R: AsyncRxTrait
     let (tx, rx) = channel;
     assert!(tx.is_empty());
     assert!(rx.is_empty());
+    assert_eq!(tx.capacity(), Some(1));
+    assert_eq!(rx.capacity(), Some(1));
     tx.try_send(1).expect("Ok");
     assert!(tx.is_full());
     assert!(rx.is_full());
@@ -49,6 +51,8 @@ fn test_basic_bounded_empty_full_drop_tx<T: AsyncTxTrait<usize>, R: AsyncRxTrait
     let (tx, rx) = channel;
     assert!(tx.is_empty());
     assert!(rx.is_empty());
+    assert_eq!(tx.capacity(), Some(1));
+    assert_eq!(rx.capacity(), Some(1));
     tx.try_send(1).expect("Ok");
     assert!(tx.is_full());
     assert!(rx.is_full());
@@ -267,6 +271,8 @@ fn test_basic_unbounded_1_thread<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     let (tx, rx) = channel;
+    assert_eq!(tx.capacity(), None);
+    assert_eq!(rx.capacity(), None);
     runtime_block_on!(async move {
         let rx_res = rx.try_recv();
         assert!(rx_res.is_err());

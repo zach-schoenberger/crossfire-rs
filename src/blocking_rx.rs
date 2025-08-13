@@ -142,6 +142,12 @@ impl<T> Rx<T> {
         self.recv.len()
     }
 
+    /// The capacity of the channel
+    #[inline]
+    pub fn capacity(&self) -> Option<usize> {
+        self.recv.capacity()
+    }
+
     /// Whether channel is empty at the moment
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -249,6 +255,9 @@ pub trait BlockingRxTrait<T: Send + 'static>:
     /// The number of messages in the channel at the moment
     fn len(&self) -> usize;
 
+    /// The capacity of the channel, None for unbounded.
+    fn capacity(&self) -> Option<usize>;
+
     /// Whether channel is empty at the moment
     fn is_empty(&self) -> bool;
 
@@ -284,6 +293,11 @@ impl<T: Send + 'static> BlockingRxTrait<T> for Rx<T> {
     }
 
     #[inline(always)]
+    fn capacity(&self) -> Option<usize> {
+        Rx::capacity(self)
+    }
+
+    #[inline(always)]
     fn is_empty(&self) -> bool {
         Rx::is_empty(self)
     }
@@ -313,6 +327,11 @@ impl<T: Send + 'static> BlockingRxTrait<T> for MRx<T> {
     #[inline(always)]
     fn len(&self) -> usize {
         self.0.len()
+    }
+
+    #[inline(always)]
+    fn capacity(&self) -> Option<usize> {
+        self.0.capacity()
     }
 
     #[inline(always)]

@@ -161,6 +161,12 @@ impl<T> AsyncRx<T> {
         self.recv.len()
     }
 
+    /// The capacity of the channel, None for unbounded.
+    #[inline]
+    pub fn capacity(&self) -> Option<usize> {
+        self.recv.capacity()
+    }
+
     /// Whether channel is empty at the moment
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
@@ -391,6 +397,9 @@ pub trait AsyncRxTrait<T: Unpin + Send + 'static>:
     /// The number of messages in the channel at the moment
     fn len(&self) -> usize;
 
+    /// The capacity of the channel
+    fn capacity(&self) -> Option<usize>;
+
     /// Whether channel is empty at the moment
     fn is_empty(&self) -> bool;
 
@@ -424,6 +433,11 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
     #[inline(always)]
     fn len(&self) -> usize {
         AsyncRx::len(self)
+    }
+
+    #[inline(always)]
+    fn capacity(&self) -> Option<usize> {
+        AsyncRx::capacity(self)
     }
 
     #[inline(always)]
@@ -530,6 +544,11 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for MAsyncRx<T> {
     #[inline(always)]
     fn len(&self) -> usize {
         self.0.len()
+    }
+
+    #[inline(always)]
+    fn capacity(&self) -> Option<usize> {
+        self.0.capacity()
     }
 
     #[inline(always)]

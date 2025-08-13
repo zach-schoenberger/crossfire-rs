@@ -27,6 +27,8 @@ fn test_basic_bounded_empty_full_drop_rx<T: BlockingTxTrait<usize>, R: BlockingR
         let (tx, rx) = _channel;
         assert!(tx.is_empty());
         assert!(rx.is_empty());
+        assert_eq!(tx.capacity(), Some(1));
+        assert_eq!(rx.capacity(), Some(1));
         tx.try_send(1).expect("Ok");
         assert!(tx.is_full());
         assert!(rx.is_full());
@@ -61,6 +63,8 @@ fn test_basic_bounded_empty_full_drop_tx<T: BlockingTxTrait<usize>, R: BlockingR
         let (tx, rx) = _channel;
         assert!(tx.is_empty());
         assert!(rx.is_empty());
+        assert_eq!(tx.capacity(), Some(1));
+        assert_eq!(rx.capacity(), Some(1));
         tx.try_send(1).expect("Ok");
         assert!(tx.is_full());
         assert!(rx.is_full());
@@ -96,6 +100,8 @@ fn test_basic_unbounded_empty_drop_rx<T: BlockingTxTrait<usize>, R: BlockingRxTr
         let (tx, rx) = _channel;
         assert!(tx.is_empty());
         assert!(rx.is_empty());
+        assert_eq!(tx.capacity(), None);
+        assert_eq!(rx.capacity(), None);
         tx.try_send(1).expect("Ok");
         assert!(!tx.is_empty());
         assert_eq!(tx.is_disconnected(), false);

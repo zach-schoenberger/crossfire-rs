@@ -142,6 +142,12 @@ impl<T> Tx<T> {
         self.sender.len()
     }
 
+    /// The capacity of the channel
+    #[inline]
+    pub fn capacity(&self) -> Option<usize> {
+        self.sender.capacity()
+    }
+
     /// Whether channel is empty at the moment
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -249,6 +255,9 @@ pub trait BlockingTxTrait<T: Send + 'static>:
     /// The number of messages in the channel at the moment
     fn len(&self) -> usize;
 
+    /// The capacity of the channel, None for unbounded.
+    fn capacity(&self) -> Option<usize>;
+
     /// Whether channel is empty at the moment
     fn is_empty(&self) -> bool;
 
@@ -284,6 +293,11 @@ impl<T: Send + 'static> BlockingTxTrait<T> for Tx<T> {
     }
 
     #[inline(always)]
+    fn capacity(&self) -> Option<usize> {
+        Tx::capacity(self)
+    }
+
+    #[inline(always)]
     fn is_empty(&self) -> bool {
         Tx::is_empty(self)
     }
@@ -313,6 +327,11 @@ impl<T: Send + 'static> BlockingTxTrait<T> for MTx<T> {
     #[inline(always)]
     fn len(&self) -> usize {
         self.0.len()
+    }
+
+    #[inline(always)]
+    fn capacity(&self) -> Option<usize> {
+        self.0.capacity()
     }
 
     #[inline(always)]
