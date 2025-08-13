@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 #[cfg(not(miri))]
 pub const ROUND: usize = 10000;
 #[cfg(miri)]
@@ -67,3 +69,55 @@ macro_rules! async_join_result {
     }};
 }
 pub(super) use async_join_result;
+
+static DROP_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+pub trait TestDropMsg: Unpin + Send + 'static {
+    fn new(v: usize) -> Self;
+
+    fn get_value(&self) -> usize;
+}
+
+pub struct SmallMsg(pub usize);
+
+impl Drop for SmallMsg {
+    fn drop(&mut self) {
+        DROP_COUNTER.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+impl TestDropMsg for SmallMsg {
+    fn new(v: usize) -> Self {
+        Self(v)
+    }
+
+    fn get_value(&self) -> usize {
+        self.0
+    }
+}
+
+pub struct LargeMsg([usize; 4]);
+
+impl TestDropMsg for LargeMsg {
+    fn new(v: usize) -> Self {
+        Self([v, v, v, v])
+    }
+
+    fn get_value(&self) -> usize {
+        self.0[0]
+    }
+}
+
+impl Drop for LargeMsg {
+    fn drop(&mut self) {
+        DROP_COUNTER.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+pub fn get_drop_counter() -> usize {
+    DROP_COUNTER.load(Ordering::SeqCst)
+}
+
+pub fn reset_drop_counter() {
+    DROP_COUNTER.store(0, Ordering::SeqCst);
+}
