@@ -15,6 +15,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.20] - 2025-08-17
+
+### Added
+
+- AsyncTxTrait: Add Into<AsyncSink<T>>
+
+- AsyncRxTrait: Add Into<AsyncStream<T>>
+
+### Fixed
+
+- Change the behavior of AsyncSink::poll_send() and AsyncStream::poll_item(), to make sure
+stream/sink wakers are notified, preventing deadlock from happening if user wants to cancel the operation.
+Add explanation to the document.
+
+- Defend against infinite loop when waking up all wakers, given the change of sink/stream.
+
 ## [2.0.19] - 2025-08-13
 
 ### Added
