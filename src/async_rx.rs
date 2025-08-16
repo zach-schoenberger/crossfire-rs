@@ -364,7 +364,7 @@ impl<T> Future for ReceiveTimeoutFuture<'_, T> {
 
 /// For writing generic code with MAsyncRx & AsyncRx
 pub trait AsyncRxTrait<T: Unpin + Send + 'static>:
-    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared>
+    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared> + Sized + Into<AsyncStream<T>>
 {
     /// Receive message, will await when channel is empty.
     ///
