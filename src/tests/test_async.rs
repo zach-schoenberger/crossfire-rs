@@ -1,6 +1,7 @@
 use super::common::*;
 use crate::{sink::*, stream::*, *};
 use captains_log::{logfn, *};
+use futures::stream::{FusedStream, StreamExt};
 use rstest::*;
 use std::future::Future;
 use std::pin::Pin;
@@ -1045,4 +1046,117 @@ fn test_spurious_stream(setup_log: ()) {
             }
         });
     }
+}
+
+#[logfn]
+#[rstest]
+#[case(spsc::bounded_async::<i32>(1))]
+#[case(spsc::bounded_async::<i32>(2))]
+#[case(mpsc::bounded_async::<i32>(1))]
+#[case(mpsc::bounded_async::<i32>(2))]
+#[case(mpmc::bounded_async::<i32>(1))]
+#[case(mpmc::bounded_async::<i32>(2))]
+fn test_basic_into_stream_1_1<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
+    setup_log: (), #[case] channel: (T, R),
+) {
+    runtime_block_on!(async move {
+        let total_message = 100;
+        let (tx, rx) = channel;
+        async_spawn!(async move {
+            println!("sender thread send {} message start", total_message);
+            for i in 0i32..total_message {
+                let _ = tx.send(i).await;
+                // println!("send {}", i);
+            }
+            println!("sender thread send {} message end", total_message);
+        });
+        let mut s: AsyncStream<i32> = rx.into();
+
+        for _i in 0..total_message {
+            assert_eq!(s.next().await, Some(_i));
+        }
+        assert_eq!(s.next().await, None);
+        assert!(s.is_terminated())
+    });
+}
+
+#[logfn]
+#[rstest]
+#[case(mpmc::bounded_async::<i32>(1), 2)]
+#[case(mpmc::bounded_async::<i32>(2), 4)]
+#[case(mpmc::bounded_async::<i32>(2), 10)]
+#[case(mpmc::bounded_async::<i32>(10), 3)]
+#[case(mpmc::bounded_async::<i32>(10), 30)]
+#[case(mpmc::bounded_async::<i32>(100), 2)]
+#[case(mpmc::bounded_async::<i32>(100), 4)]
+#[case(mpmc::bounded_async::<i32>(100), 50)]
+fn test_pressure_stream_multi(
+    setup_log: (), #[case] channel: (MAsyncTx<i32>, MAsyncRx<i32>), #[case] rx_count: usize,
+) {
+    runtime_block_on!(async move {
+        let total_message = 100000;
+        let (tx, rx) = channel;
+        let mut th_s = Vec::new();
+        let counter = Arc::new(AtomicUsize::new(0));
+        for rx_i in 0..rx_count {
+            let _rx = rx.clone();
+            let _counter = counter.clone();
+            th_s.push(async_spawn!(async move {
+                let mut stream = _rx.into_stream();
+                while let Some(_item) = stream.next().await {
+                    _counter.fetch_add(1, Ordering::SeqCst);
+                }
+                debug!("rx {} exit", rx_i);
+            }));
+        }
+        drop(rx);
+        for i in 0..total_message {
+            tx.send(i).await.expect("send");
+        }
+        drop(tx);
+        for th in th_s {
+            let _ = th.await;
+        }
+    });
+}
+
+#[logfn]
+#[rstest]
+#[case(mpmc::bounded_async::<i32>(1), 2)]
+#[case(mpmc::bounded_async::<i32>(2), 4)]
+#[case(mpmc::bounded_async::<i32>(2), 10)]
+#[case(mpmc::bounded_async::<i32>(10), 3)]
+#[case(mpmc::bounded_async::<i32>(10), 30)]
+#[case(mpmc::bounded_async::<i32>(100), 2)]
+#[case(mpmc::bounded_async::<i32>(100), 4)]
+#[case(mpmc::bounded_async::<i32>(100), 50)]
+fn test_pressure_stream_multi_idle(
+    setup_log: (), #[case] channel: (MAsyncTx<i32>, MAsyncRx<i32>), #[case] rx_count: usize,
+) {
+    runtime_block_on!(async move {
+        let total_message = 5000;
+        let (tx, rx) = channel;
+        let mut th_s = Vec::new();
+        let counter = Arc::new(AtomicUsize::new(0));
+        for rx_i in 0..rx_count {
+            let _rx = rx.clone();
+            let _counter = counter.clone();
+            th_s.push(async_spawn!(async move {
+                let mut stream = _rx.into_stream();
+                while let Some(_item) = stream.next().await {
+                    _counter.fetch_add(1, Ordering::SeqCst);
+                }
+                debug!("rx {} exit", rx_i);
+            }));
+        }
+        drop(rx);
+        for i in 0..total_message {
+            tx.send(i).await.expect("send");
+            sleep(Duration::from_millis(10)).await;
+        }
+        drop(tx);
+        for th in th_s {
+            let _ = th.await;
+        }
+    });
 }

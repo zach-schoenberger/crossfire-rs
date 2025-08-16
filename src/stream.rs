@@ -139,39 +139,3 @@ impl<T: Unpin + Send + 'static> From<MAsyncRx<T>> for AsyncStream<T> {
         rx.into_stream()
     }
 }
-
-#[cfg(test)]
-mod tests {
-
-    use crate::*;
-    use futures::stream::{FusedStream, StreamExt};
-
-    #[test]
-    fn test_into_stream() {
-        println!();
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(2)
-            .enable_all()
-            .build()
-            .unwrap();
-        rt.block_on(async move {
-            let total_message = 100;
-            let (tx, rx) = crate::mpmc::bounded_async::<i32>(2);
-            tokio::spawn(async move {
-                println!("sender thread send {} message start", total_message);
-                for i in 0i32..total_message {
-                    let _ = tx.send(i).await;
-                    // println!("send {}", i);
-                }
-                println!("sender thread send {} message end", total_message);
-            });
-            let mut s = rx.into_stream();
-
-            for _i in 0..total_message {
-                assert_eq!(s.next().await, Some(_i));
-            }
-            assert_eq!(s.next().await, None);
-            assert!(s.is_terminated())
-        });
-    }
-}
