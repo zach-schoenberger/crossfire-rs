@@ -188,7 +188,7 @@ impl<T> AsyncRx<T> {
     /// Return Err([TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
     #[inline(always)]
     pub(crate) fn poll_item(
-        &self, ctx: &mut Context, o_waker: &mut Option<LockedWaker>,
+        &self, ctx: &mut Context, o_waker: &mut Option<LockedWaker>, stream: bool,
     ) -> Result<T, TryRecvError> {
         // When the result is not TryRecvError::Empty,
         // make sure always take the o_waker out and abandon,
@@ -209,6 +209,9 @@ impl<T> AsyncRx<T> {
                 // NOTE: The other side put something whie reg_send and did not see the waker,
                 // should check the channel again, otherwise might incur a dead lock.
                 if self.recv.is_empty() {
+                    if stream {
+                        break; // Check close and return Pending
+                    }
                     if let Some(waker) = o_waker.as_ref() {
                         waker.commit();
                     } else {
@@ -297,7 +300,7 @@ impl<T> Future for ReceiveFuture<'_, T> {
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
         let mut _self = self.get_mut();
-        match _self.rx.poll_item(ctx, &mut _self.waker) {
+        match _self.rx.poll_item(ctx, &mut _self.waker, false) {
             Err(e) => {
                 if !e.is_empty() {
                     return Poll::Ready(Err(RecvError {}));
@@ -342,7 +345,7 @@ impl<T> Future for ReceiveTimeoutFuture<'_, T> {
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
         let mut _self = self.get_mut();
-        match _self.rx.poll_item(ctx, &mut _self.waker) {
+        match _self.rx.poll_item(ctx, &mut _self.waker, false) {
             Err(TryRecvError::Empty) => {
                 if let Poll::Ready(()) = _self.sleep.as_mut().poll(ctx) {
                     return Poll::Ready(Err(RecvTimeoutError::Timeout));

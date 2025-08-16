@@ -189,7 +189,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
         return SendTimeoutFuture { tx: &self, item: Some(item), waker: None, sleep };
     }
 
-    /// Internal function might change in the future. For public version, use AsyncSink::poll_send() instead
+    /// Internal function might change in the future. For public version, use AsyncSink::poll_send() instead.
     ///
     /// Returns `Ok(())` on message sent.
     ///
@@ -199,6 +199,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
     #[inline(always)]
     pub(crate) fn poll_send<'a>(
         &'a self, ctx: &'a mut Context, mut item: T, o_waker: &'a mut Option<LockedWaker>,
+        sink: bool,
     ) -> Result<(), TrySendError<T>> {
         // When the result is not TrySendError::Full,
         // make sure always take the o_waker out and abandon,
@@ -222,6 +223,9 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
                 // NOTE: The other side put something whie reg_send and did not see the waker,
                 // should check the channel again, otherwise might incur a dead lock.
                 if self.sender.is_full() {
+                    if sink {
+                        break; // Check close and return Pending
+                    }
                     if let Some(waker) = o_waker.as_ref() {
                         waker.commit();
                     } else {
@@ -296,7 +300,7 @@ impl<T: Unpin + Send + 'static> Future for SendFuture<'_, T> {
         let mut _self = self.get_mut();
         let item = _self.item.take().unwrap();
         let tx = _self.tx;
-        let r = tx.poll_send(ctx, item, &mut _self.waker);
+        let r = tx.poll_send(ctx, item, &mut _self.waker, false);
         match r {
             Ok(()) => {
                 return Poll::Ready(Ok(()));
@@ -345,7 +349,7 @@ impl<T: Unpin + Send + 'static> Future for SendTimeoutFuture<'_, T> {
         let mut _self = self.get_mut();
         let item = _self.item.take().unwrap();
         let tx = _self.tx;
-        let r = tx.poll_send(ctx, item, &mut _self.waker);
+        let r = tx.poll_send(ctx, item, &mut _self.waker, false);
         match r {
             Ok(()) => {
                 return Poll::Ready(Ok(()));

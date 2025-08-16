@@ -54,17 +54,33 @@ impl<T: Unpin + Send + 'static> From<MAsyncTx<T>> for AsyncSink<T> {
 }
 
 impl<T: Send + Unpin + 'static> AsyncSink<T> {
-    /// poll_send() will try to send message, if not successful, will register notification for
-    /// the next poll.
+    /// poll_send() will try to send message.
+    /// On channel full, will register notification for the next poll.
+    ///
+    /// # Behavior
+    ///
+    /// The polling behavior is different from [SendFuture](crate::SendFuture).
+    /// Because waker is not exposed to user, you cannot to delicate operation to
+    /// the waker (compared to the `Drop` handler in `SendFuture`).
+    /// To make sure no deadlock happen on cancellation,
+    /// WakerState will be `INIT` after registered (and will not convert to `WAITING`).
+    /// The receivers will wake up all `INIT` state wakers,
+    /// until it find a normal pending sender in `WAITING` state.
+    ///
+    /// # Return value:
     ///
     /// Returns `Ok(())` on message sent.
     ///
     /// Returns Err([crate::TrySendError::Full]) for Poll::Pending case.
+    /// The next time channel is not full, your future will be waked again,
+    /// should continue calling poll_send() to send message.
+    /// If you want to cancel, just don't call poll_send() again and there's no side-effect,
+    /// others always have chances to send message.
     ///
     /// Returns Err([crate::TrySendError::Disconnected]) when all Rx dropped.
     #[inline]
     pub fn poll_send(&mut self, ctx: &mut Context, item: T) -> Result<(), TrySendError<T>> {
-        self.tx.poll_send(ctx, item, &mut self.waker)
+        self.tx.poll_send(ctx, item, &mut self.waker, true)
     }
 }
 
