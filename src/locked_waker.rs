@@ -121,6 +121,15 @@ impl LockedWaker {
 
 impl LockedWakerRef {
     #[inline(always)]
+    pub(crate) fn upgrade(&self) -> Option<LockedWaker> {
+        if let Some(inner) = self.0.upgrade() {
+            Some(LockedWaker(inner))
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
     pub(crate) fn wake(&self) -> bool {
         if let Some(_self) = self.0.upgrade() {
             return LockedWaker(_self).wake();
