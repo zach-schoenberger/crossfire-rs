@@ -370,7 +370,7 @@ impl<T: Unpin + Send + 'static> Future for SendTimeoutFuture<'_, T> {
 
 /// For writing generic code with MAsyncTx & AsyncTx
 pub trait AsyncTxTrait<T: Unpin + Send + 'static>:
-    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared>
+    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared> + Sized + Into<AsyncSink<T>>
 {
     /// Try to send message, non-blocking
     ///
