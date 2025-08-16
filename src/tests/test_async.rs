@@ -1,11 +1,14 @@
 use super::common::*;
-use crate::*;
+use crate::{sink::*, stream::*, *};
 use captains_log::{logfn, *};
 use rstest::*;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+use std::task::*;
 use std::thread;
 use std::time::Duration;
 
@@ -899,4 +902,147 @@ fn test_conversion() {
     let _stream: AsyncStream<usize> = rx.into(); // AsyncRx -> AsyncStream
     let (_mtx, mrx) = mpmc::bounded_async(1);
     let _stream: AsyncStream<usize> = mrx.into(); // AsyncRx -> AsyncStream
+}
+
+struct SpuriousTx {
+    sink: AsyncSink<usize>,
+    normal: bool,
+    step: usize,
+}
+
+impl Future for SpuriousTx {
+    type Output = Result<usize, usize>;
+
+    fn poll(self: Pin<&mut Self>, ctx: &mut std::task::Context) -> Poll<Self::Output> {
+        let mut _self = self.get_mut();
+        if !_self.normal && _self.step > 0 {
+            return Poll::Ready(Err(_self.step));
+        }
+        match _self.sink.poll_send(ctx, _self.step) {
+            Ok(_) => {
+                let res = _self.step;
+                _self.step += 1;
+                return Poll::Ready(Ok(res));
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                return Poll::Ready(Err(_self.step));
+            }
+            Err(TrySendError::Full(_)) => {
+                _self.step += 1;
+                return Poll::Pending;
+            }
+        }
+    }
+}
+
+struct SpuriousRx {
+    stream: AsyncStream<usize>,
+    normal: bool,
+    step: usize,
+}
+
+impl Future for SpuriousRx {
+    type Output = Result<usize, usize>;
+
+    fn poll(self: Pin<&mut Self>, ctx: &mut std::task::Context) -> Poll<Self::Output> {
+        let mut _self = self.get_mut();
+        if !_self.normal && _self.step > 0 {
+            return Poll::Ready(Err(_self.step));
+        }
+        match _self.stream.poll_item(ctx) {
+            Poll::Ready(Some(item)) => {
+                _self.step += 1;
+                return Poll::Ready(Ok(item));
+            }
+            Poll::Ready(None) => {
+                return Poll::Ready(Err(_self.step));
+            }
+            Poll::Pending => {
+                _self.step += 1;
+                return Poll::Pending;
+            }
+        }
+    }
+}
+
+#[logfn]
+#[rstest]
+fn test_spurious_sink(setup_log: ()) {
+    #[cfg(feature = "tokio")]
+    {
+        let (tx, rx) = mpmc::bounded_async::<usize>(1);
+
+        async fn spawn_tx(tx: MAsyncTx<usize>, normal: bool) {
+            let sink = tx.into_sink();
+            let _tx = SpuriousTx { sink, normal, step: 0 };
+            if normal {
+                assert_eq!(_tx.await.expect("send ok"), 1);
+            } else {
+                if let Ok(Err(step)) = tokio::time::timeout(Duration::from_secs(5), _tx).await {
+                    assert_eq!(step, 1);
+                } else {
+                    unreachable!();
+                }
+            }
+        }
+        runtime_block_on!(async move {
+            tx.send(0).await.expect("send");
+            let _tx = tx.clone();
+            let mut th_s = Vec::new();
+            println!("spawn spurious");
+            // Make sure its the first
+            th_s.push(tokio::spawn(async move { spawn_tx(_tx, false).await }));
+            sleep(Duration::from_secs(1)).await;
+            let _tx = tx.clone();
+            println!("spawn normal");
+            th_s.push(tokio::spawn(async move { spawn_tx(_tx, true).await }));
+            sleep(Duration::from_secs(1)).await;
+            println!("recv 1 to make the 2 senders waked");
+            assert_eq!(rx.recv().await.expect("recv"), 0);
+            for th in th_s {
+                let _ = th.await.expect("join ok");
+            }
+        });
+    }
+}
+
+#[logfn]
+#[rstest]
+fn test_spurious_stream(setup_log: ()) {
+    #[cfg(feature = "tokio")]
+    {
+        let (tx, rx) = mpmc::bounded_async::<usize>(1);
+
+        async fn spawn_rx(rx: MAsyncRx<usize>, normal: bool) {
+            let stream = rx.into_stream();
+            let _rx = SpuriousRx { stream, normal, step: 0 };
+            if normal {
+                assert_eq!(_rx.await.expect("recv ok"), 1);
+            } else {
+                if let Ok(Err(step)) = tokio::time::timeout(Duration::from_secs(10), _rx).await {
+                    assert_eq!(step, 1);
+                } else {
+                    unreachable!();
+                }
+            }
+        }
+        runtime_block_on!(async move {
+            let _rx = rx.clone();
+            let mut th_s = Vec::new();
+            println!("spawn spurious");
+            // Make sure its the first
+            th_s.push(tokio::spawn(async move { spawn_rx(_rx, false).await }));
+            sleep(Duration::from_millis(500)).await;
+            let _rx = rx.clone();
+            println!("spawn normal");
+            th_s.push(tokio::spawn(async move { spawn_rx(_rx, true).await }));
+            sleep(Duration::from_secs(1)).await;
+            println!("send");
+            tx.send(1).await.expect("send");
+            sleep(Duration::from_secs(2)).await;
+            for th in th_s {
+                let _ = th.await.expect("join ok");
+            }
+        });
+    }
 }
