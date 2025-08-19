@@ -35,7 +35,9 @@
 //! cargo bench --bench crossfire
 //! ```
 //!
-//! Some benchmark data is posted on [wiki](https://github.com/frostyplanet/crossfire-rs/wiki).
+//! Some benchmark data is posted on [wiki](https://github.com/frostyplanet/crossfire-rs/wiki/benchmark-v2.0.14-2025%E2%80%9008%E2%80%9003).
+//!
+//! <img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2.0.14-2025-08-03/mpsc_size_100_async.png" alt="mpsc bounded size 100 async context">
 //!
 //! ## APIs
 //!
@@ -124,9 +126,6 @@
 //! when the sending/receiving futures are cancelled (like tokio::time::timeout()),
 //! might trigger immediate cleanup if non-conflict conditions are met.
 //! Otherwise will rely on lazy cleanup. (waker will be consumed by actual message send and recv).
-//!
-//! Never the less, for close notification without sending anything, crossfire::mpmc can be heavy
-//! and I suggest that use `tokio::sync::oneshot` instead.
 //!
 //! ## Usage
 //!

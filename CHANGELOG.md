@@ -15,6 +15,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.20] - 2025-08-17
+
+### Added
+
+- AsyncTxTrait: Add Into<AsyncSink<T>>
+
+- AsyncRxTrait: Add Into<AsyncStream<T>>
+
+### Fixed
+
+- Change the behavior of AsyncSink::poll_send() and AsyncStream::poll_item(), to make sure
+stream/sink wakers are notified, preventing deadlock from happening if user wants to cancel the operation.
+Add explanation to the document.
+
+- Defend against infinite loop when waking up all wakers, given the change of sink/stream.
+
+## [2.0.19] - 2025-08-13
+
+### Added
+
+- Add capacity()
+
+## [2.0.18] - 2025-08-11
+
+### Fixed
+
+- Change some atomic load ordering from Acquire to SeqCst to pass validation by Miri.
+
+## [2.0.17] - 2025-08-08
+
+### Fixed
+
+- Reuse and cleanup waker as much as possible (for idle select scenario)
+
+- Change some atomic store ordering from Release to SeqCst to avoid further trouble.
+
+## [2.0.16] - 2025-08-04
+
+### Added
+
+- Add into_blocking()
+
+- Add missing into_sink() for MAsyncTx.
+
+- Add From for AsyncSink and AsyncStream.
+
+## [2.0.15] - 2025-08-04
+
+### Added
+
+- Add missing conversion: MAsyncTx->AsyncTx and MTx->Tx
+
+## [2.0.14] - 2025-08-03
+
+### Changed
+
+- Optimise bounded size 1 speed with backoff
+
+- Updated benchmark result vs kanal to wiki
+
+## [2.0.13] - 2025-07-24
+
+### Fixed
+
+- Fix a deadlock https://github.com/frostyplanet/crossfire-rs/issues/22
+
+### Added
+
+- Allow type conversion from AsyncTx -> Tx, AsyncRx -> Rx
+
 ## [2.0.12] - 2025-07-18
 
 ### Fixed

@@ -1,6 +1,7 @@
-use crate::channel::*;
 use crate::stream::AsyncStream;
+use crate::{channel::*, MRx, Rx};
 use crossbeam::channel::Receiver;
+use crossbeam::utils::Backoff;
 use std::cell::Cell;
 use std::fmt;
 use std::future::Future;
@@ -10,9 +11,16 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
+const BACKOFF_LIMIT: usize = 6;
+
 /// Single consumer (receiver) that works in async context.
 ///
 /// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
+///
+/// `AsyncRx` can be converted into `Rx` via `From` trait,
+/// that means you can have two types of receivers both within async and
+/// blocking context for the same channel.
+
 ///
 /// **NOTE: AsyncRx is not Clone, nor Sync.**
 /// If you need concurrent access, use [MAsyncRx](crate::MAsyncRx) instead.
@@ -48,6 +56,7 @@ use std::task::{Context, Poll};
 /// }
 /// ```
 pub struct AsyncRx<T> {
+    bound_size: usize,
     pub(crate) recv: Receiver<T>,
     pub(crate) shared: Arc<ChannelShared>,
     // Remove the Sync marker to prevent being put in Arc
@@ -77,7 +86,8 @@ impl<T> Drop for AsyncRx<T> {
 impl<T> AsyncRx<T> {
     #[inline]
     pub(crate) fn new(recv: Receiver<T>, shared: Arc<ChannelShared>) -> Self {
-        Self { recv, shared, _phan: Default::default() }
+        let bound_size = recv.capacity().unwrap_or(0);
+        Self { bound_size, recv, shared, _phan: Default::default() }
     }
 
     /// Receive message, will await when channel is empty.
@@ -151,6 +161,12 @@ impl<T> AsyncRx<T> {
         self.recv.len()
     }
 
+    /// The capacity of the channel, None for unbounded.
+    #[inline]
+    pub fn capacity(&self) -> Option<usize> {
+        self.recv.capacity()
+    }
+
     /// Whether channel is empty at the moment
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
@@ -172,46 +188,68 @@ impl<T> AsyncRx<T> {
     /// Return Err([TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
     #[inline(always)]
     pub(crate) fn poll_item(
-        &self, ctx: &mut Context, o_waker: &mut Option<LockedWaker>,
+        &self, ctx: &mut Context, o_waker: &mut Option<LockedWaker>, stream: bool,
     ) -> Result<T, TryRecvError> {
         // When the result is not TryRecvError::Empty,
         // make sure always take the o_waker out and abandon,
         // to skip the timeout cleaning logic in Drop.
-        let r = self.try_recv();
-        if let Some(old_waker) = o_waker.take() {
-            // https://github.com/frostyplanet/crossfire-rs/issues/14
-            old_waker.cancel();
-        }
-        if let Err(TryRecvError::Empty) = &r {
-        } else {
-            return r;
-        }
-        let waker = self.shared.reg_recv_async(ctx);
-        // NOTE: The other side put something whie reg_send and did not see the waker,
-        // should check the channel again, otherwise might incur a dead lock.
-        let r = self.try_recv();
-        if let Err(TryRecvError::Empty) = &r {
-            // Check channel close before sleep, otherwise might block forever
-            // Confirmed by test_pressure_1_tx_blocking_1_rx_async()
-            if self.shared.get_tx_count() == 0 {
-                // Ensure all message is received.
-                if let Ok(msg) = self.try_recv() {
-                    return Ok(msg);
+        let backoff = Backoff::new();
+        let limit = if self.bound_size == 1 { BACKOFF_LIMIT } else { 1 };
+        loop {
+            for _ in 0..limit {
+                let r = self.try_recv();
+                if let Err(TryRecvError::Empty) = &r {
+                } else {
+                    let _ = o_waker.take();
+                    return r;
                 }
-                return Err(TryRecvError::Disconnected);
+                backoff.snooze();
             }
-            o_waker.replace(waker);
-        } else {
-            self.shared.cancel_recv_waker(waker);
+            if self.shared.reg_recv_async(ctx, o_waker) {
+                // NOTE: The other side put something whie reg_send and did not see the waker,
+                // should check the channel again, otherwise might incur a dead lock.
+                if self.recv.is_empty() {
+                    if stream {
+                        break; // Check close and return Pending
+                    }
+                    if let Some(waker) = o_waker.as_ref() {
+                        waker.commit();
+                    } else {
+                        unreachable!();
+                    }
+                } else {
+                    if let Some(waker) = o_waker.take() {
+                        self.shared.recvs.cancel_waker(&waker);
+                    }
+                    continue;
+                }
+            }
+            break;
         }
-        return r;
+        // Check channel close before sleep, otherwise might block forever
+        // Confirmed by test_pressure_1_tx_blocking_1_rx_async()
+        if self.shared.is_disconnected() {
+            let _ = o_waker.take();
+            // Ensure all message is received.
+            if let Ok(msg) = self.try_recv() {
+                return Ok(msg);
+            }
+            return Err(TryRecvError::Disconnected);
+        }
+        return Err(TryRecvError::Empty);
     }
 
+    #[inline]
     pub fn into_stream(self) -> AsyncStream<T>
     where
         T: Send + Unpin + 'static,
     {
         AsyncStream::new(self)
+    }
+
+    #[inline]
+    pub fn into_blocking(self) -> Rx<T> {
+        self.into()
     }
 
     /// Receive a message while **blocking the current thread**. Be careful!
@@ -245,10 +283,12 @@ impl<T> Drop for ReceiveFuture<'_, T> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
             // Cancelling the future, poll is not ready
-            if waker.abandon() {
+            let state = waker.abandon();
+            if state == WakerState::WAKED as u8 {
                 // We are waked, but giving up to recv, should notify another receiver for safety
                 self.rx.shared.on_send();
             } else {
+                debug_assert_eq!(state, WakerState::WAITING as u8);
                 self.rx.shared.clear_recv_wakers(waker.get_seq());
             }
         }
@@ -260,7 +300,7 @@ impl<T> Future for ReceiveFuture<'_, T> {
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
         let mut _self = self.get_mut();
-        match _self.rx.poll_item(ctx, &mut _self.waker) {
+        match _self.rx.poll_item(ctx, &mut _self.waker, false) {
             Err(e) => {
                 if !e.is_empty() {
                     return Poll::Ready(Err(RecvError {}));
@@ -276,45 +316,36 @@ impl<T> Future for ReceiveFuture<'_, T> {
 }
 
 /// A fixed-sized future object constructed by [AsyncRx::recv_timeout()]
-#[cfg(any(feature = "tokio", feature = "async_std"))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
 pub struct ReceiveTimeoutFuture<'a, T> {
     rx: &'a AsyncRx<T>,
     waker: Option<LockedWaker>,
-    #[cfg(feature = "tokio")]
-    sleep: Pin<Box<tokio::time::Sleep>>,
-    #[cfg(not(feature = "tokio"))]
     sleep: Pin<Box<dyn Future<Output = ()>>>,
 }
 
-#[cfg(any(feature = "tokio", feature = "async_std"))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
 unsafe impl<T: Unpin + Send> Send for ReceiveTimeoutFuture<'_, T> {}
 
-#[cfg(any(feature = "tokio", feature = "async_std"))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
 impl<T> Drop for ReceiveTimeoutFuture<'_, T> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
             // Cancelling the future, poll is not ready
-            if waker.abandon() {
+            let state = waker.abandon();
+            if state == WakerState::WAKED as u8 {
                 // We are waked, but giving up to recv, should notify another receiver for safety
                 self.rx.shared.on_send();
             } else {
+                debug_assert_eq!(state, WakerState::WAITING as u8);
                 self.rx.shared.clear_recv_wakers(waker.get_seq());
             }
         }
     }
 }
 
-#[cfg(any(feature = "tokio", feature = "async_std"))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
 impl<T> Future for ReceiveTimeoutFuture<'_, T> {
     type Output = Result<T, RecvTimeoutError>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
         let mut _self = self.get_mut();
-        match _self.rx.poll_item(ctx, &mut _self.waker) {
+        match _self.rx.poll_item(ctx, &mut _self.waker, false) {
             Err(TryRecvError::Empty) => {
                 if let Poll::Ready(()) = _self.sleep.as_mut().poll(ctx) {
                     return Poll::Ready(Err(RecvTimeoutError::Timeout));
@@ -333,7 +364,7 @@ impl<T> Future for ReceiveTimeoutFuture<'_, T> {
 
 /// For writing generic code with MAsyncRx & AsyncRx
 pub trait AsyncRxTrait<T: Unpin + Send + 'static>:
-    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared>
+    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared> + Sized + Into<AsyncStream<T>>
 {
     /// Receive message, will await when channel is empty.
     ///
@@ -368,6 +399,9 @@ pub trait AsyncRxTrait<T: Unpin + Send + 'static>:
 
     /// The number of messages in the channel at the moment
     fn len(&self) -> usize;
+
+    /// The capacity of the channel
+    fn capacity(&self) -> Option<usize>;
 
     /// Whether channel is empty at the moment
     fn is_empty(&self) -> bool;
@@ -405,6 +439,11 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
     }
 
     #[inline(always)]
+    fn capacity(&self) -> Option<usize> {
+        AsyncRx::capacity(self)
+    }
+
+    #[inline(always)]
     fn is_empty(&self) -> bool {
         AsyncRx::is_empty(self)
     }
@@ -421,6 +460,11 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
 /// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
 ///
 /// You can use `into()` to convert it to `AsyncRx<T>`.
+///
+/// `MAsyncRx` can be converted into `MRx` via `From` trait,
+/// that means you can have two types of receivers both within async and
+/// blocking context for the same channel.
+
 pub struct MAsyncRx<T>(pub(crate) AsyncRx<T>);
 
 impl<T> fmt::Debug for MAsyncRx<T> {
@@ -465,12 +509,18 @@ impl<T> MAsyncRx<T> {
     {
         AsyncStream::new(self.0)
     }
+
+    #[inline]
+    pub fn into_blocking(self) -> MRx<T> {
+        self.into()
+    }
 }
 
 impl<T> Deref for MAsyncRx<T> {
     type Target = AsyncRx<T>;
 
     /// inherit all the functions of [AsyncRx]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -500,6 +550,11 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for MAsyncRx<T> {
     }
 
     #[inline(always)]
+    fn capacity(&self) -> Option<usize> {
+        self.0.capacity()
+    }
+
+    #[inline(always)]
     fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -512,18 +567,21 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for MAsyncRx<T> {
 
 impl<T> Deref for AsyncRx<T> {
     type Target = ChannelShared;
+    #[inline(always)]
     fn deref(&self) -> &ChannelShared {
         &self.shared
     }
 }
 
 impl<T> AsRef<ChannelShared> for AsyncRx<T> {
+    #[inline(always)]
     fn as_ref(&self) -> &ChannelShared {
         &self.shared
     }
 }
 
 impl<T> AsRef<ChannelShared> for MAsyncRx<T> {
+    #[inline(always)]
     fn as_ref(&self) -> &ChannelShared {
         &self.0.shared
     }

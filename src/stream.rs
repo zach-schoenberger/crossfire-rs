@@ -1,5 +1,5 @@
 use crate::locked_waker::LockedWaker;
-use crate::AsyncRx;
+use crate::{AsyncRx, MAsyncRx};
 use futures::stream;
 use std::fmt;
 use std::ops::Deref;
@@ -36,20 +36,33 @@ where
         Self { rx, waker: None, ended: false }
     }
 
-    /// poll_item() will try to receive message, if not successful, will register notification for
-    /// the next poll.
+    /// poll_item() will try to receive message.
+    /// On channel empty, will register notification for the next poll.
+    ///
+    /// # Behavior
+    ///
+    /// The polling behavior is different from [ReceiveFuture](crate::ReceiveFuture).
+    /// Because waker is not exposed to user, you cannot to delicate operation to
+    /// the waker (compared to the `Drop` handler in `ReceiveFuture`).
+    /// To make sure no deadlock happen on cancellation,
+    /// WakerState will be `INIT` after registered (and will not convert to `WAITING`).
+    /// The senders will wake up all `INIT` state wakers,
+    /// until it find a normal pending receiver in `WAITING` state.
+    ///
+    /// # Return Value:
     ///
     /// Returns `Ok(T)` on successful.
     ///
     /// Return Err([crate::TryRecvError::Empty]) for Poll::Pending case.
+    /// The next time channel is not empty, your future will be waked again,
+    /// should continue calling poll_item() to receive message.
+    /// If you want to cancel, just don't call poll_item(), others always have chances
+    /// to receive messages.
     ///
     /// Return Err([crate::TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
     #[inline]
     pub fn poll_item(&mut self, ctx: &mut Context) -> Poll<Option<T>> {
-        if self.ended {
-            return Poll::Ready(None);
-        }
-        match self.rx.poll_item(ctx, &mut self.waker) {
+        match self.rx.poll_item(ctx, &mut self.waker, true) {
             Ok(item) => Poll::Ready(Some(item)),
             Err(e) => {
                 if e.is_empty() {
@@ -80,7 +93,19 @@ where
     #[inline(always)]
     fn poll_next(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Option<Self::Item>> {
         let mut _self = self.get_mut();
-        return _self.poll_item(ctx);
+        if _self.ended {
+            return Poll::Ready(None);
+        }
+        match _self.rx.poll_item(ctx, &mut _self.waker, false) {
+            Ok(item) => Poll::Ready(Some(item)),
+            Err(e) => {
+                if e.is_empty() {
+                    return Poll::Pending;
+                }
+                _self.ended = true;
+                return Poll::Ready(None);
+            }
+        }
     }
 }
 
@@ -101,38 +126,16 @@ impl<T> Drop for AsyncStream<T> {
     }
 }
 
-#[cfg(test)]
-mod tests {
+impl<T: Unpin + Send + 'static> From<AsyncRx<T>> for AsyncStream<T> {
+    #[inline]
+    fn from(rx: AsyncRx<T>) -> Self {
+        rx.into_stream()
+    }
+}
 
-    use crate::*;
-    use futures::stream::{FusedStream, StreamExt};
-
-    #[test]
-    fn test_into_stream() {
-        println!();
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(2)
-            .enable_all()
-            .build()
-            .unwrap();
-        rt.block_on(async move {
-            let total_message = 100;
-            let (tx, rx) = crate::mpmc::bounded_async::<i32>(2);
-            tokio::spawn(async move {
-                println!("sender thread send {} message start", total_message);
-                for i in 0i32..total_message {
-                    let _ = tx.send(i).await;
-                    // println!("send {}", i);
-                }
-                println!("sender thread send {} message end", total_message);
-            });
-            let mut s = rx.into_stream();
-
-            for _i in 0..total_message {
-                assert_eq!(s.next().await, Some(_i));
-            }
-            assert_eq!(s.next().await, None);
-            assert!(s.is_terminated())
-        });
+impl<T: Unpin + Send + 'static> From<MAsyncRx<T>> for AsyncStream<T> {
+    #[inline]
+    fn from(rx: MAsyncRx<T>) -> Self {
+        rx.into_stream()
     }
 }

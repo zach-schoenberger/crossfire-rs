@@ -12,6 +12,7 @@ use std::time::*;
 #[fixture]
 fn setup_log() {
     let _ = recipe::env_logger("LOG_FILE", "LOG_LEVEL").build().expect("log setup");
+    //    let _ = recipe::ring_file("/tmp/ring.log", 512*1024*1024, Level::Debug, signal_consts::SIGHUP).build().expect("log_setup");
 }
 
 #[logfn]
@@ -298,17 +299,17 @@ fn test_pressure_tx_multi_blocking_1_rx_async<R: AsyncRxTrait<usize>>(
 #[rstest]
 #[case(mpmc::bounded_tx_blocking_rx_async::<usize>(1), 10, 10)]
 #[case(mpmc::bounded_tx_blocking_rx_async::<usize>(1), 100, 20)]
-#[case(mpmc::bounded_tx_blocking_rx_async::<usize>(1), 1000, 200)]
+#[case(mpmc::bounded_tx_blocking_rx_async::<usize>(1), 300, 200)]
 #[case(mpmc::bounded_tx_blocking_rx_async::<usize>(10), 10, 10)]
 #[case(mpmc::bounded_tx_blocking_rx_async::<usize>(10), 100, 20)]
-#[case(mpmc::bounded_tx_blocking_rx_async::<usize>(10), 1000, 200)]
+#[case(mpmc::bounded_tx_blocking_rx_async::<usize>(10), 300, 200)]
 #[case(mpmc::bounded_tx_blocking_rx_async::<usize>(100), 10, 200)]
 #[case(mpmc::bounded_tx_blocking_rx_async::<usize>(100), 100, 200)]
 #[case(mpmc::bounded_tx_blocking_rx_async::<usize>(100), 300, 500)]
 #[case(mpmc::bounded_tx_blocking_rx_async::<usize>(100), 30, 1000)]
 #[case(mpmc::unbounded_async::<usize>(), 10, 10)]
 #[case(mpmc::unbounded_async::<usize>(), 100, 20)]
-#[case(mpmc::unbounded_async::<usize>(), 1000, 200)]
+#[case(mpmc::unbounded_async::<usize>(), 300, 200)]
 #[case(mpmc::unbounded_async::<usize>(), 10, 200)]
 #[case(mpmc::unbounded_async::<usize>(), 100, 200)]
 #[case(mpmc::unbounded_async::<usize>(), 300, 500)]

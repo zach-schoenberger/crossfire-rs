@@ -13,6 +13,12 @@ pub struct WeakCell<T> {
 unsafe impl<T> Send for WeakCell<T> {}
 unsafe impl<T> Sync for WeakCell<T> {}
 
+impl<T> Drop for WeakCell<T> {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
 impl<T> WeakCell<T> {
     #[inline(always)]
     pub fn new() -> Self {
@@ -26,7 +32,7 @@ impl<T> WeakCell<T> {
 
     #[inline(always)]
     pub fn pop(&self) -> Option<Arc<T>> {
-        if self.ptr.load(Ordering::Acquire) == ptr::null_mut() {
+        if self.ptr.load(Ordering::SeqCst) == ptr::null_mut() {
             return None;
         }
         let ptr = self.ptr.swap(ptr::null_mut(), Ordering::SeqCst);
@@ -69,20 +75,20 @@ impl<T> LockedQueue<T> {
     pub fn push(&self, msg: T) {
         let mut guard = self.queue.lock();
         if guard.is_empty() {
-            self.empty.store(false, Ordering::Release);
+            self.empty.store(false, Ordering::SeqCst);
         }
         guard.push_back(msg);
     }
 
     #[inline(always)]
     pub fn pop(&self) -> Option<T> {
-        if self.empty.load(Ordering::Acquire) {
+        if self.empty.load(Ordering::SeqCst) {
             return None;
         }
         let mut guard = self.queue.lock();
         if let Some(item) = guard.pop_front() {
             if guard.len() == 0 {
-                self.empty.store(true, Ordering::Release);
+                self.empty.store(true, Ordering::SeqCst);
             }
             Some(item)
         } else {

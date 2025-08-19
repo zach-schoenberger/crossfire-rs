@@ -1,7 +1,7 @@
 use crate::collections::WeakCell;
 use std::fmt;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicU64, AtomicU8, Ordering},
     Arc, Weak,
 };
 use std::task::*;
@@ -12,14 +12,26 @@ pub struct LockedWaker(Arc<LockedWakerInner>);
 impl fmt::Debug for LockedWaker {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let _self = self.0.as_ref();
-        write!(f, "LockedWaker(seq={}, waked={})", _self.seq, _self.waked.load(Ordering::Acquire))
+        write!(
+            f,
+            "LockedWaker(seq={}, state={})",
+            _self.seq.load(Ordering::Acquire),
+            _self.state.load(Ordering::Acquire)
+        )
     }
+}
+
+#[repr(u8)]
+pub(crate) enum WakerState {
+    INIT = 0,
+    WAITING = 1,
+    WAKED = 2,
 }
 
 struct LockedWakerInner {
     waker: std::task::Waker,
-    waked: AtomicBool,
-    seq: u64,
+    state: AtomicU8,
+    seq: AtomicU64,
 }
 
 pub struct LockedWakerRef(Weak<LockedWakerInner>);
@@ -32,30 +44,55 @@ impl fmt::Debug for LockedWakerRef {
 
 impl LockedWaker {
     #[inline(always)]
-    pub(crate) fn new(ctx: &Context, seq: u64) -> Self {
+    pub(crate) fn new(ctx: &Context) -> Self {
         let s = Arc::new(LockedWakerInner {
-            seq,
+            seq: AtomicU64::new(0),
             waker: ctx.waker().clone(),
-            waked: AtomicBool::new(false),
+            state: AtomicU8::new(WakerState::INIT as u8),
         });
         Self(s)
     }
 
     #[inline(always)]
     pub(crate) fn get_seq(&self) -> u64 {
-        self.0.seq
+        self.0.seq.load(Ordering::Acquire)
+    }
+
+    #[inline(always)]
+    pub(crate) fn set_seq(&self, seq: u64) {
+        self.0.seq.store(seq, Ordering::Release);
+    }
+
+    #[inline(always)]
+    pub(crate) fn reset_init(&self) {
+        self.0.state.store(WakerState::INIT as u8, Ordering::Release);
+    }
+
+    #[inline(always)]
+    pub(crate) fn commit(&self) {
+        // Content with wake() on the other-side
+        let _ = self.0.state.compare_exchange(
+            WakerState::INIT as u8,
+            WakerState::WAITING as u8,
+            Ordering::SeqCst,
+            Ordering::Relaxed,
+        );
     }
 
     // return is_already waked
     #[inline(always)]
-    pub(crate) fn cancel(&self) {
-        self.0.waked.store(true, Ordering::Release)
+    pub(crate) fn abandon(&self) -> u8 {
+        return self.0.state.swap(WakerState::WAKED as u8, Ordering::SeqCst);
     }
 
-    // return is_already waked
     #[inline(always)]
-    pub(crate) fn abandon(&self) -> bool {
-        self.0.waked.swap(true, Ordering::SeqCst)
+    pub(crate) fn get_state(&self) -> u8 {
+        self.0.state.load(Ordering::Acquire)
+    }
+
+    #[inline(always)]
+    pub(crate) fn will_wake(&self, ctx: &Context) -> bool {
+        self.0.waker.will_wake(ctx.waker())
     }
 
     #[inline(always)]
@@ -65,22 +102,33 @@ impl LockedWaker {
 
     #[inline(always)]
     pub(crate) fn is_waked(&self) -> bool {
-        self.0.waked.load(Ordering::Acquire)
+        self.0.state.load(Ordering::Acquire) == WakerState::WAKED as u8
     }
 
     /// return true on suc wake up, false when already woken up.
     #[inline(always)]
     pub(crate) fn wake(&self) -> bool {
         let _self = self.0.as_ref();
-        let waked = _self.waked.swap(true, Ordering::SeqCst);
-        if waked == false {
+        let old_state = _self.state.swap(WakerState::WAKED as u8, Ordering::SeqCst);
+        // No matter the flag, call wake anyway
+        if old_state != WakerState::WAKED as u8 {
             _self.waker.wake_by_ref();
         }
-        return !waked;
+        // NOTE: INIT is in between state
+        return old_state == WakerState::WAITING as u8;
     }
 }
 
 impl LockedWakerRef {
+    #[inline(always)]
+    pub(crate) fn upgrade(&self) -> Option<LockedWaker> {
+        if let Some(inner) = self.0.upgrade() {
+            Some(LockedWaker(inner))
+        } else {
+            None
+        }
+    }
+
     #[inline(always)]
     pub(crate) fn wake(&self) -> bool {
         if let Some(_self) = self.0.upgrade() {
@@ -130,11 +178,11 @@ impl WakerCell {
     }
 
     #[inline(always)]
-    pub fn wake(&self) -> bool {
+    pub fn pop(&self) -> Option<LockedWaker> {
         if let Some(waker) = self.0.pop() {
-            return LockedWaker(waker).wake();
+            return Some(LockedWaker(waker));
         }
-        false
+        None
     }
 
     #[inline(always)]

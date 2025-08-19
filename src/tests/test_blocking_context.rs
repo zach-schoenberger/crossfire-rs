@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 #[fixture]
 fn setup_log() {
     let _ = recipe::env_logger("LOG_FILE", "LOG_LEVEL").build().expect("log setup");
+    //    let _ = recipe::ring_file("/tmp/ring.log", 512*1024*1024, Level::Debug, signal_consts::SIGHUP).build().expect("log_setup");
 }
 
 #[logfn]
@@ -26,6 +27,8 @@ fn test_basic_bounded_empty_full_drop_rx<T: BlockingTxTrait<usize>, R: BlockingR
         let (tx, rx) = _channel;
         assert!(tx.is_empty());
         assert!(rx.is_empty());
+        assert_eq!(tx.capacity(), Some(1));
+        assert_eq!(rx.capacity(), Some(1));
         tx.try_send(1).expect("Ok");
         assert!(tx.is_full());
         assert!(rx.is_full());
@@ -60,6 +63,8 @@ fn test_basic_bounded_empty_full_drop_tx<T: BlockingTxTrait<usize>, R: BlockingR
         let (tx, rx) = _channel;
         assert!(tx.is_empty());
         assert!(rx.is_empty());
+        assert_eq!(tx.capacity(), Some(1));
+        assert_eq!(rx.capacity(), Some(1));
         tx.try_send(1).expect("Ok");
         assert!(tx.is_full());
         assert!(rx.is_full());
@@ -95,6 +100,8 @@ fn test_basic_unbounded_empty_drop_rx<T: BlockingTxTrait<usize>, R: BlockingRxTr
         let (tx, rx) = _channel;
         assert!(tx.is_empty());
         assert!(rx.is_empty());
+        assert_eq!(tx.capacity(), None);
+        assert_eq!(rx.capacity(), None);
         tx.try_send(1).expect("Ok");
         assert!(!tx.is_empty());
         assert_eq!(tx.is_disconnected(), false);
@@ -550,4 +557,11 @@ fn test_pressure_bounded_timeout_blocking(setup_log: (), #[case] _channel: (MTx<
         println!("send timeout count: {}", send_timeout_counter.load(Ordering::Acquire));
         println!("recv timeout count: {}", recv_timeout_counter.load(Ordering::Acquire));
     }
+}
+
+#[test]
+fn test_conversion() {
+    let (mtx, mrx) = mpmc::bounded_blocking::<usize>(1);
+    let _tx: Tx<usize> = mtx.into();
+    let _rx: Rx<usize> = mrx.into();
 }

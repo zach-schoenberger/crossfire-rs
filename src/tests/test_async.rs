@@ -1,16 +1,22 @@
 use super::common::*;
-use crate::*;
+use crate::{sink::*, stream::*, *};
 use captains_log::{logfn, *};
+use futures::stream::{FusedStream, StreamExt};
 use rstest::*;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+use std::task::*;
+use std::thread;
 use std::time::Duration;
 
 #[fixture]
 fn setup_log() {
     let _ = recipe::env_logger("LOG_FILE", "LOG_LEVEL").build().expect("log setup");
+    //    let _ = recipe::ring_file("/tmp/ring.log", 512*1024*1024, Level::Debug, signal_consts::SIGHUP).build().expect("log_setup");
 }
 
 #[logfn]
@@ -24,6 +30,8 @@ fn test_basic_bounded_empty_full_drop_rx<T: AsyncTxTrait<usize>, R: AsyncRxTrait
     let (tx, rx) = channel;
     assert!(tx.is_empty());
     assert!(rx.is_empty());
+    assert_eq!(tx.capacity(), Some(1));
+    assert_eq!(rx.capacity(), Some(1));
     tx.try_send(1).expect("Ok");
     assert!(tx.is_full());
     assert!(rx.is_full());
@@ -47,6 +55,8 @@ fn test_basic_bounded_empty_full_drop_tx<T: AsyncTxTrait<usize>, R: AsyncRxTrait
     let (tx, rx) = channel;
     assert!(tx.is_empty());
     assert!(rx.is_empty());
+    assert_eq!(tx.capacity(), Some(1));
+    assert_eq!(rx.capacity(), Some(1));
     tx.try_send(1).expect("Ok");
     assert!(tx.is_full());
     assert!(rx.is_full());
@@ -265,6 +275,8 @@ fn test_basic_unbounded_1_thread<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     let (tx, rx) = channel;
+    assert_eq!(tx.capacity(), None);
+    assert_eq!(rx.capacity(), None);
     runtime_block_on!(async move {
         let rx_res = rx.try_recv();
         assert!(rx_res.is_err());
@@ -306,6 +318,7 @@ fn test_basic_unbounded_1_thread<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
 fn test_basic_unbounded_idle_select<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
+    // This case simulate the usage of a close notification channel
     let (_tx, rx) = channel;
 
     use futures::{pin_mut, select, FutureExt};
@@ -317,8 +330,10 @@ fn test_basic_unbounded_idle_select<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32
                 pin_mut!(f);
                 select! {
                     _ = f => {
-                        let (_tx_wakers, _rx_wakers) = rx.as_ref().get_wakers_count();
-                        debug!("waker tx {} rx {}", _tx_wakers, _rx_wakers);
+                        let (tx_wakers, rx_wakers) = rx.as_ref().get_wakers_count();
+                        debug!("waker tx {} rx {}", tx_wakers, rx_wakers);
+                        assert_eq!(tx_wakers, 0, "tx wakers {}", tx_wakers);
+                        assert!(rx_wakers <= 1, "rx wakers {}", rx_wakers);
                     },
                     _ = c => {
                         unreachable!()
@@ -441,7 +456,7 @@ fn test_basic_unbounded_recv_timeout_async<T: BlockingTxTrait<i32>, R: AsyncRxTr
         let (tx, rx) = _channel;
         runtime_block_on!(async move {
             let th = async_spawn!(async move {
-                sleep(Duration::from_millis(2)).await;
+                sleep(Duration::from_millis(200)).await;
                 let _ = tx.send(1);
             });
             assert_eq!(
@@ -804,5 +819,344 @@ fn test_pressure_bounded_async_multi(
             let _ = th.await;
         }
         assert_eq!(counter.as_ref().load(Ordering::Acquire), round * tx_count);
+    });
+}
+
+#[logfn]
+#[rstest]
+#[case(mpmc::bounded_async::<usize>(1))]
+#[case(mpmc::bounded_async::<usize>(10))]
+#[case(mpmc::bounded_async::<usize>(100))]
+fn test_pressure_bounded_mixed_async_blocking_conversion(
+    setup_log: (), #[case] channel: (MAsyncTx<usize>, MAsyncRx<usize>),
+) {
+    let (tx, rx) = channel;
+    runtime_block_on!(async move {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let round: usize = 10000;
+        let mut th_s = Vec::new();
+        let mut co_s = Vec::new();
+        let _tx: MTx<usize> = tx.clone().into();
+        th_s.push(thread::spawn(move || {
+            for i in 0..round {
+                match _tx.send(i) {
+                    Err(e) => panic!("{:?}", e),
+                    _ => {}
+                }
+            }
+            debug!("tx blocking exit");
+        }));
+        co_s.push(async_spawn!(async move {
+            for i in 0..round {
+                match tx.send(i).await {
+                    Err(e) => panic!("{:?}", e),
+                    _ => {}
+                }
+            }
+            debug!("tx async exit");
+        }));
+        let _rx: MRx<usize> = rx.clone().into();
+        let _counter = counter.clone();
+        th_s.push(thread::spawn(move || {
+            'A: loop {
+                match _rx.recv() {
+                    Ok(_i) => {
+                        _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                        debug!("recv blocking {}", _i);
+                    }
+                    Err(_) => break 'A,
+                }
+            }
+            debug!("rx blocking exit");
+        }));
+
+        let _counter = counter.clone();
+        co_s.push(async_spawn!(async move {
+            'A: loop {
+                match rx.recv().await {
+                    Ok(_i) => {
+                        _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                        debug!("recv async {}", _i);
+                    }
+                    Err(_) => break 'A,
+                }
+            }
+            debug!("rx async exit");
+        }));
+        for th in co_s {
+            let _ = th.await;
+        }
+        for th in th_s {
+            let _ = th.join();
+        }
+        assert_eq!(counter.as_ref().load(Ordering::Acquire), round * 2);
+    });
+}
+
+#[test]
+fn test_conversion() {
+    use crate::stream::AsyncStream;
+    let (mtx, mrx) = mpmc::bounded_async(1);
+    let _tx: AsyncTx<usize> = mtx.into();
+    let _rx: AsyncRx<usize> = mrx.into();
+    let (_mtx, rx) = mpsc::bounded_async(1);
+    let _stream: AsyncStream<usize> = rx.into(); // AsyncRx -> AsyncStream
+    let (_mtx, mrx) = mpmc::bounded_async(1);
+    let _stream: AsyncStream<usize> = mrx.into(); // AsyncRx -> AsyncStream
+}
+
+struct SpuriousTx {
+    sink: AsyncSink<usize>,
+    normal: bool,
+    step: usize,
+}
+
+impl Future for SpuriousTx {
+    type Output = Result<usize, usize>;
+
+    fn poll(self: Pin<&mut Self>, ctx: &mut std::task::Context) -> Poll<Self::Output> {
+        let mut _self = self.get_mut();
+        if !_self.normal && _self.step > 0 {
+            return Poll::Ready(Err(_self.step));
+        }
+        match _self.sink.poll_send(ctx, _self.step) {
+            Ok(_) => {
+                let res = _self.step;
+                _self.step += 1;
+                return Poll::Ready(Ok(res));
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                return Poll::Ready(Err(_self.step));
+            }
+            Err(TrySendError::Full(_)) => {
+                _self.step += 1;
+                return Poll::Pending;
+            }
+        }
+    }
+}
+
+struct SpuriousRx {
+    stream: AsyncStream<usize>,
+    normal: bool,
+    step: usize,
+}
+
+impl Future for SpuriousRx {
+    type Output = Result<usize, usize>;
+
+    fn poll(self: Pin<&mut Self>, ctx: &mut std::task::Context) -> Poll<Self::Output> {
+        let mut _self = self.get_mut();
+        if !_self.normal && _self.step > 0 {
+            return Poll::Ready(Err(_self.step));
+        }
+        match _self.stream.poll_item(ctx) {
+            Poll::Ready(Some(item)) => {
+                _self.step += 1;
+                return Poll::Ready(Ok(item));
+            }
+            Poll::Ready(None) => {
+                return Poll::Ready(Err(_self.step));
+            }
+            Poll::Pending => {
+                _self.step += 1;
+                return Poll::Pending;
+            }
+        }
+    }
+}
+
+#[logfn]
+#[rstest]
+fn test_spurious_sink(setup_log: ()) {
+    #[cfg(feature = "tokio")]
+    {
+        let (tx, rx) = mpmc::bounded_async::<usize>(1);
+
+        async fn spawn_tx(tx: MAsyncTx<usize>, normal: bool) {
+            let sink = tx.into_sink();
+            let _tx = SpuriousTx { sink, normal, step: 0 };
+            if normal {
+                assert_eq!(_tx.await.expect("send ok"), 1);
+            } else {
+                if let Ok(Err(step)) = tokio::time::timeout(Duration::from_secs(5), _tx).await {
+                    assert_eq!(step, 1);
+                } else {
+                    unreachable!();
+                }
+            }
+        }
+        runtime_block_on!(async move {
+            tx.send(0).await.expect("send");
+            let _tx = tx.clone();
+            let mut th_s = Vec::new();
+            println!("spawn spurious");
+            // Make sure its the first
+            th_s.push(tokio::spawn(async move { spawn_tx(_tx, false).await }));
+            sleep(Duration::from_secs(1)).await;
+            let _tx = tx.clone();
+            println!("spawn normal");
+            th_s.push(tokio::spawn(async move { spawn_tx(_tx, true).await }));
+            sleep(Duration::from_secs(1)).await;
+            println!("recv 1 to make the 2 senders waked");
+            assert_eq!(rx.recv().await.expect("recv"), 0);
+            for th in th_s {
+                let _ = th.await.expect("join ok");
+            }
+        });
+    }
+}
+
+#[logfn]
+#[rstest]
+fn test_spurious_stream(setup_log: ()) {
+    #[cfg(feature = "tokio")]
+    {
+        let (tx, rx) = mpmc::bounded_async::<usize>(1);
+
+        async fn spawn_rx(rx: MAsyncRx<usize>, normal: bool) {
+            let stream = rx.into_stream();
+            let _rx = SpuriousRx { stream, normal, step: 0 };
+            if normal {
+                assert_eq!(_rx.await.expect("recv ok"), 1);
+            } else {
+                if let Ok(Err(step)) = tokio::time::timeout(Duration::from_secs(10), _rx).await {
+                    assert_eq!(step, 1);
+                } else {
+                    unreachable!();
+                }
+            }
+        }
+        runtime_block_on!(async move {
+            let _rx = rx.clone();
+            let mut th_s = Vec::new();
+            println!("spawn spurious");
+            // Make sure its the first
+            th_s.push(tokio::spawn(async move { spawn_rx(_rx, false).await }));
+            sleep(Duration::from_millis(500)).await;
+            let _rx = rx.clone();
+            println!("spawn normal");
+            th_s.push(tokio::spawn(async move { spawn_rx(_rx, true).await }));
+            sleep(Duration::from_secs(1)).await;
+            println!("send");
+            tx.send(1).await.expect("send");
+            sleep(Duration::from_secs(2)).await;
+            for th in th_s {
+                let _ = th.await.expect("join ok");
+            }
+        });
+    }
+}
+
+#[logfn]
+#[rstest]
+#[case(spsc::bounded_async::<i32>(1))]
+#[case(spsc::bounded_async::<i32>(2))]
+#[case(mpsc::bounded_async::<i32>(1))]
+#[case(mpsc::bounded_async::<i32>(2))]
+#[case(mpmc::bounded_async::<i32>(1))]
+#[case(mpmc::bounded_async::<i32>(2))]
+fn test_basic_into_stream_1_1<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
+    setup_log: (), #[case] channel: (T, R),
+) {
+    runtime_block_on!(async move {
+        let total_message = 100;
+        let (tx, rx) = channel;
+        async_spawn!(async move {
+            println!("sender thread send {} message start", total_message);
+            for i in 0i32..total_message {
+                let _ = tx.send(i).await;
+                // println!("send {}", i);
+            }
+            println!("sender thread send {} message end", total_message);
+        });
+        let mut s: AsyncStream<i32> = rx.into();
+
+        for _i in 0..total_message {
+            assert_eq!(s.next().await, Some(_i));
+        }
+        assert_eq!(s.next().await, None);
+        assert!(s.is_terminated())
+    });
+}
+
+#[logfn]
+#[rstest]
+#[case(mpmc::bounded_async::<i32>(1), 2)]
+#[case(mpmc::bounded_async::<i32>(2), 4)]
+#[case(mpmc::bounded_async::<i32>(2), 10)]
+#[case(mpmc::bounded_async::<i32>(10), 3)]
+#[case(mpmc::bounded_async::<i32>(10), 30)]
+#[case(mpmc::bounded_async::<i32>(100), 2)]
+#[case(mpmc::bounded_async::<i32>(100), 4)]
+#[case(mpmc::bounded_async::<i32>(100), 50)]
+fn test_pressure_stream_multi(
+    setup_log: (), #[case] channel: (MAsyncTx<i32>, MAsyncRx<i32>), #[case] rx_count: usize,
+) {
+    runtime_block_on!(async move {
+        let total_message = 100000;
+        let (tx, rx) = channel;
+        let mut th_s = Vec::new();
+        let counter = Arc::new(AtomicUsize::new(0));
+        for rx_i in 0..rx_count {
+            let _rx = rx.clone();
+            let _counter = counter.clone();
+            th_s.push(async_spawn!(async move {
+                let mut stream = _rx.into_stream();
+                while let Some(_item) = stream.next().await {
+                    _counter.fetch_add(1, Ordering::SeqCst);
+                }
+                debug!("rx {} exit", rx_i);
+            }));
+        }
+        drop(rx);
+        for i in 0..total_message {
+            tx.send(i).await.expect("send");
+        }
+        drop(tx);
+        for th in th_s {
+            let _ = th.await;
+        }
+    });
+}
+
+#[logfn]
+#[rstest]
+#[case(mpmc::bounded_async::<i32>(1), 2)]
+#[case(mpmc::bounded_async::<i32>(2), 4)]
+#[case(mpmc::bounded_async::<i32>(2), 10)]
+#[case(mpmc::bounded_async::<i32>(10), 3)]
+#[case(mpmc::bounded_async::<i32>(10), 30)]
+#[case(mpmc::bounded_async::<i32>(100), 2)]
+#[case(mpmc::bounded_async::<i32>(100), 4)]
+#[case(mpmc::bounded_async::<i32>(100), 50)]
+fn test_pressure_stream_multi_idle(
+    setup_log: (), #[case] channel: (MAsyncTx<i32>, MAsyncRx<i32>), #[case] rx_count: usize,
+) {
+    runtime_block_on!(async move {
+        let total_message = 5000;
+        let (tx, rx) = channel;
+        let mut th_s = Vec::new();
+        let counter = Arc::new(AtomicUsize::new(0));
+        for rx_i in 0..rx_count {
+            let _rx = rx.clone();
+            let _counter = counter.clone();
+            th_s.push(async_spawn!(async move {
+                let mut stream = _rx.into_stream();
+                while let Some(_item) = stream.next().await {
+                    _counter.fetch_add(1, Ordering::SeqCst);
+                }
+                debug!("rx {} exit", rx_i);
+            }));
+        }
+        drop(rx);
+        for i in 0..total_message {
+            tx.send(i).await.expect("send");
+            sleep(Duration::from_millis(10)).await;
+        }
+        drop(tx);
+        for th in th_s {
+            let _ = th.await;
+        }
     });
 }

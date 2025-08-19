@@ -1,9 +1,9 @@
-use crate::channel::*;
+use crate::{channel::*, AsyncTx, MAsyncTx};
 use crossbeam::channel::Sender;
 use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -64,6 +64,13 @@ impl<T> fmt::Display for Tx<T> {
 impl<T> Drop for Tx<T> {
     fn drop(&mut self) {
         self.shared.close_tx();
+    }
+}
+
+impl<T> From<AsyncTx<T>> for Tx<T> {
+    fn from(value: AsyncTx<T>) -> Self {
+        value.add_tx();
+        Self::new(value.sender.clone(), value.shared.clone())
     }
 }
 
@@ -135,6 +142,12 @@ impl<T> Tx<T> {
         self.sender.len()
     }
 
+    /// The capacity of the channel
+    #[inline]
+    pub fn capacity(&self) -> Option<usize> {
+        self.sender.capacity()
+    }
+
     /// Whether channel is empty at the moment
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -168,6 +181,19 @@ impl<T> fmt::Display for MTx<T> {
     }
 }
 
+impl<T> From<MTx<T>> for Tx<T> {
+    fn from(tx: MTx<T>) -> Self {
+        tx.0
+    }
+}
+
+impl<T> From<MAsyncTx<T>> for MTx<T> {
+    fn from(value: MAsyncTx<T>) -> Self {
+        value.add_tx();
+        Self::new(value.sender.clone(), value.shared.clone())
+    }
+}
+
 unsafe impl<T: Send> Sync for MTx<T> {}
 
 impl<T> MTx<T> {
@@ -190,15 +216,9 @@ impl<T> Deref for MTx<T> {
     type Target = Tx<T>;
 
     /// inherit all the functions of [Tx]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-impl<T> DerefMut for MTx<T> {
-    /// inherit all the functions of [Tx]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
@@ -235,6 +255,9 @@ pub trait BlockingTxTrait<T: Send + 'static>:
     /// The number of messages in the channel at the moment
     fn len(&self) -> usize;
 
+    /// The capacity of the channel, None for unbounded.
+    fn capacity(&self) -> Option<usize>;
+
     /// Whether channel is empty at the moment
     fn is_empty(&self) -> bool;
 
@@ -270,6 +293,11 @@ impl<T: Send + 'static> BlockingTxTrait<T> for Tx<T> {
     }
 
     #[inline(always)]
+    fn capacity(&self) -> Option<usize> {
+        Tx::capacity(self)
+    }
+
+    #[inline(always)]
     fn is_empty(&self) -> bool {
         Tx::is_empty(self)
     }
@@ -302,6 +330,11 @@ impl<T: Send + 'static> BlockingTxTrait<T> for MTx<T> {
     }
 
     #[inline(always)]
+    fn capacity(&self) -> Option<usize> {
+        self.0.capacity()
+    }
+
+    #[inline(always)]
     fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -314,18 +347,21 @@ impl<T: Send + 'static> BlockingTxTrait<T> for MTx<T> {
 
 impl<T> Deref for Tx<T> {
     type Target = ChannelShared;
+    #[inline(always)]
     fn deref(&self) -> &ChannelShared {
         &self.shared
     }
 }
 
 impl<T> AsRef<ChannelShared> for Tx<T> {
+    #[inline(always)]
     fn as_ref(&self) -> &ChannelShared {
         &self.shared
     }
 }
 
 impl<T> AsRef<ChannelShared> for MTx<T> {
+    #[inline(always)]
     fn as_ref(&self) -> &ChannelShared {
         &self.0.shared
     }
