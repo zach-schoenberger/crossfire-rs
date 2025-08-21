@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.22] - 2025-08-21
+
+### Fixed
+
+- RegistryMulti: Fix defend against infinite loop for sink/stream, code introduced from 2.0.20.
+
 ## [2.0.21] - 2025-08-21
 
 ### Added
