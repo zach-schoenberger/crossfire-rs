@@ -87,7 +87,7 @@ impl<T: Send + Unpin + 'static> AsyncSink<T> {
 impl<T> Drop for AsyncSink<T> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
-            self.tx.shared.clear_recv_wakers(waker.get_seq());
+            self.tx.shared.clear_send_wakers(waker.get_seq());
         }
     }
 }
