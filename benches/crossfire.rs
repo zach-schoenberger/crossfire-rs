@@ -10,36 +10,110 @@ use std::time::Duration;
 mod common;
 use common::*;
 
-fn _crossfire_btx_clone(tx: MTx<usize>, count: usize) -> Vec<MTx<usize>> {
-    let mut v = Vec::with_capacity(count);
-    for _ in 0..count {
-        v.push(tx.clone());
-    }
-    v
+macro_rules! bench_bounded_blocking {
+    ($group: expr, $name: expr, $tx: expr, $rx: expr, $new: expr, $size: expr, $count: expr) => {
+        bench_bounded_blocking!($group, $name, $tx, $rx, $new, $size, $count, 20, 100);
+    };
+    ($group: expr, $name: expr, $tx: expr, $rx: expr, $new: expr, $size: expr, $count: expr, $time: expr, $sample: expr) => {
+        $group.throughput(Throughput::Elements($count as u64));
+        $group.significance_level(0.1).sample_size($sample);
+        $group.measurement_time(Duration::from_secs($time));
+        let param = Concurrency { tx_count: $tx, rx_count: $rx };
+        $group.bench_with_input(
+            BenchmarkId::new(format!("{}_{}", $name, $size).to_string(), &param),
+            &param,
+            |b, i| {
+                b.iter(move || {
+                    let (tx, rx) = $new($size);
+                    _crossfire_blocking(
+                        tx.clone_to_vec(i.tx_count),
+                        rx.clone_to_vec(i.rx_count),
+                        $count,
+                    );
+                })
+            },
+        );
+    };
 }
 
-fn _crossfire_brx_clone(rx: MRx<usize>, count: usize) -> Vec<MRx<usize>> {
-    let mut v = Vec::with_capacity(count);
-    for _ in 0..count {
-        v.push(rx.clone());
-    }
-    v
+macro_rules! bench_unbounded_blocking {
+    ($group: expr, $name: expr, $tx: expr, $rx: expr, $new: expr, $count: expr) => {
+        bench_unbounded_blocking!($group, $name, $tx, $rx, $new, $count, 20, 100);
+    };
+    ($group: expr, $name: expr, $tx: expr, $rx: expr, $new: expr, $count: expr, $time: expr, $sample: expr) => {
+        $group.throughput(Throughput::Elements($count as u64));
+        $group.significance_level(0.1).sample_size($sample);
+        $group.measurement_time(Duration::from_secs($time));
+        let param = Concurrency { tx_count: $tx, rx_count: $rx };
+        $group.bench_with_input(
+            BenchmarkId::new(format!("{}", $name).to_string(), &param),
+            &param,
+            |b, i| {
+                b.iter(move || {
+                    let (tx, rx) = $new();
+                    _crossfire_blocking(
+                        tx.clone_to_vec(i.tx_count),
+                        rx.clone_to_vec(i.rx_count),
+                        $count,
+                    );
+                })
+            },
+        );
+    };
 }
 
-fn _crossfire_atx_clone(tx: MAsyncTx<usize>, count: usize) -> Vec<MAsyncTx<usize>> {
-    let mut v = Vec::with_capacity(count);
-    for _ in 0..count {
-        v.push(tx.clone());
-    }
-    v
+macro_rules! bench_bounded_async {
+    ($group: expr, $name: expr, $tx: expr, $rx: expr, $new: expr, $size: expr, $count: expr) => {
+        bench_bounded_async!($group, $name, $tx, $rx, $new, $size, $count, 20, 100);
+    };
+    ($group: expr, $name: expr, $tx: expr, $rx: expr, $new: expr, $size: expr, $count: expr, $time: expr, $sample: expr) => {
+        $group.throughput(Throughput::Elements($count as u64));
+        $group.significance_level(0.1).sample_size($sample);
+        $group.measurement_time(Duration::from_secs($time));
+        let param = Concurrency { tx_count: $tx, rx_count: $rx };
+        $group.bench_with_input(
+            BenchmarkId::new(format!("{}_{}", $name, $size).to_string(), &param),
+            &param,
+            |b, i| {
+                b.to_async(get_runtime()).iter(async || {
+                    let (tx, rx) = $new($size);
+                    _crossfire_bounded_async(
+                        tx.clone_to_vec(i.tx_count),
+                        rx.clone_to_vec(i.rx_count),
+                        $count,
+                    )
+                    .await;
+                })
+            },
+        );
+    };
 }
 
-fn _crossfire_arx_clone(rx: MAsyncRx<usize>, count: usize) -> Vec<MAsyncRx<usize>> {
-    let mut v = Vec::with_capacity(count);
-    for _ in 0..count {
-        v.push(rx.clone());
-    }
-    v
+macro_rules! bench_unbounded_async {
+    ($group: expr, $name: expr, $tx: expr, $rx: expr, $new: expr, $count: expr) => {
+        bench_unbounded_async!($group, $name, $tx, $rx, $new, $count, 20, 100);
+    };
+    ($group: expr, $name: expr, $tx: expr, $rx: expr, $new: expr, $count: expr, $time: expr, $sample: expr) => {
+        $group.throughput(Throughput::Elements($count as u64));
+        $group.significance_level(0.1).sample_size($sample);
+        $group.measurement_time(Duration::from_secs($time));
+        let param = Concurrency { tx_count: $tx, rx_count: $rx };
+        $group.bench_with_input(
+            BenchmarkId::new(format!("{}", $name).to_string(), &param),
+            &param,
+            |b, i| {
+                b.to_async(get_runtime()).iter(async || {
+                    let (tx, rx) = $new();
+                    _crossfire_blocking_async(
+                        tx.clone_to_vec(i.tx_count),
+                        rx.clone_to_vec(i.rx_count),
+                        $count,
+                    )
+                    .await;
+                })
+            },
+        );
+    };
 }
 
 fn _crossfire_blocking<T: BlockingTxTrait<usize>, R: BlockingRxTrait<usize>>(
@@ -206,428 +280,300 @@ async fn _crossfire_bounded_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>
     assert!(recv_counter.load(Ordering::Acquire) >= msg_count);
 }
 
-fn bench_crossfire_bounded_blocking_1_1(c: &mut Criterion) {
-    let mut group = c.benchmark_group("crossfire_bounded_blocking_1_1");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(10));
-    for (size, msg_count) in [(1, TEN_THOUSAND), (100, ONE_MILLION)] {
-        group.throughput(Throughput::Elements(msg_count as u64));
-        group.bench_function(format!("spsc 1x1 size {}", size).to_string(), |b| {
-            b.iter(move || {
-                let (tx, rx) = crossfire::spsc::bounded_blocking(size);
-                _crossfire_blocking(vec![tx], vec![rx], msg_count);
-            })
-        });
-        group.throughput(Throughput::Elements(msg_count as u64));
-        group.bench_function(format!("mpsc 1x1 size {}", size).to_string(), |b| {
-            b.iter(move || {
-                let (tx, rx) = crossfire::mpsc::bounded_blocking(size);
-                _crossfire_blocking(vec![tx], vec![rx], msg_count);
-            })
-        });
-        group.throughput(Throughput::Elements(msg_count as u64));
-        group.bench_function(format!("mpmc 1x1 size {}", size).to_string(), |b| {
-            b.iter(move || {
-                let (tx, rx) = crossfire::mpmc::bounded_blocking(size);
-                _crossfire_blocking(vec![tx], vec![rx], msg_count);
-            })
-        });
-    }
+fn crossfire_bounded_1_blocking_1_1(c: &mut Criterion) {
+    let mut group = c.benchmark_group("crossfire_bounded_1_blocking_1_1");
+    bench_bounded_blocking!(group, "spsc", 1, 1, spsc::bounded_blocking, 1, TEN_THOUSAND, 10, 100);
+    bench_bounded_blocking!(group, "mpsc", 1, 1, mpsc::bounded_blocking, 1, TEN_THOUSAND, 10, 100);
+    bench_bounded_blocking!(group, "mpmc", 1, 1, mpmc::bounded_blocking, 1, TEN_THOUSAND, 10, 100);
     group.finish();
 }
 
-fn bench_crossfire_bounded_1_blocking_mpsc(c: &mut Criterion) {
+fn crossfire_bounded_1_blocking_n_1(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_bounded_1_blocking_n_1");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(20));
     for tx_count in [1, 2, 4, 8, 16] {
-        group.throughput(Throughput::Elements(TEN_THOUSAND as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc", tx_count), &tx_count, |b, i| {
-            b.iter(move || {
-                let (tx, rx) = crossfire::mpsc::bounded_blocking(1);
-                _crossfire_blocking(_crossfire_btx_clone(tx, *i), vec![rx], TEN_THOUSAND);
-            })
-        });
-        group.throughput(Throughput::Elements(TEN_THOUSAND as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc", tx_count), &tx_count, |b, i| {
-            b.iter(move || {
-                let (tx, rx) = crossfire::mpmc::bounded_blocking(1);
-                _crossfire_blocking(_crossfire_btx_clone(tx, *i), vec![rx], TEN_THOUSAND);
-            })
-        });
+        bench_bounded_blocking!(
+            group,
+            "mpsc",
+            tx_count,
+            1,
+            mpsc::bounded_blocking,
+            1,
+            TEN_THOUSAND,
+            10,
+            100
+        );
+    }
+    for tx_count in [1, 2, 4, 8, 16] {
+        bench_bounded_blocking!(
+            group,
+            "mpmc",
+            tx_count,
+            1,
+            mpmc::bounded_blocking,
+            1,
+            TEN_THOUSAND,
+            10,
+            100
+        );
     }
     group.finish();
 }
 
-fn bench_crossfire_bounded_1_blocking_mpmc(c: &mut Criterion) {
+fn crossfire_bounded_1_blocking_n_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_bounded_1_blocking_n_n");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(20));
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
-        let param = Concurrency { tx_count: input.0, rx_count: input.1 };
-        group.throughput(Throughput::Elements(TEN_THOUSAND as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc", &param), &param, |b, i| {
-            b.iter(move || {
-                let (tx, rx) = crossfire::mpmc::bounded_blocking(1);
-                _crossfire_blocking(
-                    _crossfire_btx_clone(tx, i.tx_count),
-                    _crossfire_brx_clone(rx, i.rx_count),
-                    TEN_THOUSAND,
-                );
-            })
-        });
+        bench_bounded_blocking!(
+            group,
+            "mpmc",
+            input.0,
+            input.1,
+            mpmc::bounded_blocking,
+            1,
+            TEN_THOUSAND,
+            10,
+            100
+        );
     }
     group.finish();
 }
 
-fn bench_crossfire_bounded_100_blocking_mpsc(c: &mut Criterion) {
+fn crossfire_bounded_100_blocking_1_1(c: &mut Criterion) {
+    let mut group = c.benchmark_group("crossfire_bounded_100_blocking_1_1");
+    bench_bounded_blocking!(group, "spsc", 1, 1, spsc::bounded_blocking, 100, ONE_MILLION);
+    bench_bounded_blocking!(group, "mpsc", 1, 1, mpsc::bounded_blocking, 100, ONE_MILLION);
+    bench_bounded_blocking!(group, "mpmc", 1, 1, mpmc::bounded_blocking, 100, ONE_MILLION);
+    group.finish();
+}
+
+fn crossfire_bounded_100_blocking_n_1(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_bounded_100_blocking_n_1");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(20));
     for tx_count in [1, 2, 4, 8, 16] {
-        group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc", tx_count), &tx_count, |b, i| {
-            b.iter(move || {
-                let (tx, rx) = crossfire::mpsc::bounded_blocking(100);
-                _crossfire_blocking(_crossfire_btx_clone(tx, *i), vec![rx], ONE_MILLION);
-            })
-        });
-        group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc", tx_count), &tx_count, |b, i| {
-            b.iter(move || {
-                let (tx, rx) = crossfire::mpmc::bounded_blocking(100);
-                _crossfire_blocking(_crossfire_btx_clone(tx, *i), vec![rx], ONE_MILLION);
-            })
-        });
+        bench_bounded_blocking!(
+            group,
+            "mpsc",
+            tx_count,
+            1,
+            mpsc::bounded_blocking,
+            100,
+            ONE_MILLION
+        );
+    }
+    for tx_count in [1, 2, 4, 8, 16] {
+        bench_bounded_blocking!(
+            group,
+            "mpmc",
+            tx_count,
+            1,
+            mpmc::bounded_blocking,
+            100,
+            ONE_MILLION
+        );
     }
     group.finish();
 }
 
-fn bench_crossfire_bounded_100_blocking_mpmc(c: &mut Criterion) {
+fn crossfire_bounded_100_blocking_n_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_bounded_100_blocking_n_n");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(20));
-    group.throughput(Throughput::Elements(ONE_MILLION as u64));
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
-        let param = Concurrency { tx_count: input.0, rx_count: input.1 };
-        group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc", &param), &param, |b, i| {
-            b.iter(move || {
-                let (tx, rx) = crossfire::mpmc::bounded_blocking(100);
-                _crossfire_blocking(
-                    _crossfire_btx_clone(tx, i.tx_count),
-                    _crossfire_brx_clone(rx, i.rx_count),
-                    ONE_MILLION,
-                );
-            })
-        });
+        bench_bounded_blocking!(
+            group,
+            "mpmc",
+            input.0,
+            input.1,
+            mpmc::bounded_blocking,
+            100,
+            ONE_MILLION
+        );
     }
     group.finish();
 }
 
-fn bench_crossfire_bounded_async_1_1(c: &mut Criterion) {
-    let mut group = c.benchmark_group("crossfire_bounded_async_1_1");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(10));
-    for (size, msg_count) in [(1, TEN_THOUSAND), (100, ONE_MILLION)] {
-        group.throughput(Throughput::Elements(msg_count as u64));
-        group.bench_function(format!("spsc 1x1 size {}", size).to_string(), |b| {
-            b.to_async(get_runtime()).iter(async || {
-                let (tx, rx) = crossfire::spsc::bounded_async(size);
-                _crossfire_bounded_async(vec![tx], vec![rx], msg_count).await;
-            })
-        });
-        group.throughput(Throughput::Elements(msg_count as u64));
-        group.bench_function(format!("mpsc 1x1 size {}", size).to_string(), |b| {
-            b.to_async(get_runtime()).iter(async || {
-                let (tx, rx) = crossfire::mpsc::bounded_async(size);
-                _crossfire_bounded_async(vec![tx], vec![rx], msg_count).await;
-            })
-        });
-        group.throughput(Throughput::Elements(msg_count as u64));
-        group.bench_function(format!("mpmc 1x1 size {}", size).to_string(), |b| {
-            b.to_async(get_runtime()).iter(async || {
-                let (tx, rx) = crossfire::mpmc::bounded_async(size);
-                _crossfire_bounded_async(vec![tx], vec![rx], msg_count).await;
-            })
-        });
-    }
+fn crossfire_bounded_1_async_1_1(c: &mut Criterion) {
+    let mut group = c.benchmark_group("crossfire_bounded_1_async_1_1");
+    bench_bounded_async!(group, "spsc", 1, 1, spsc::bounded_async, 1, TEN_THOUSAND, 10, 100);
+    bench_bounded_async!(group, "mpsc", 1, 1, mpsc::bounded_async, 1, TEN_THOUSAND, 10, 100);
+    bench_bounded_async!(group, "mpmc", 1, 1, mpmc::bounded_async, 1, TEN_THOUSAND, 10, 100);
     group.finish();
 }
 
-fn bench_crossfire_bounded_1_async_mpsc(c: &mut Criterion) {
+fn crossfire_bounded_1_async_n_1(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_bounded_1_async_n_1");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(20));
     for tx_count in [2, 4, 8, 16] {
-        group.throughput(Throughput::Elements(TEN_THOUSAND as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc", tx_count), &tx_count, |b, i| {
-            b.to_async(get_runtime()).iter(async || {
-                let (tx, rx) = crossfire::mpsc::bounded_async(1);
-                _crossfire_bounded_async(_crossfire_atx_clone(tx, *i), vec![rx], TEN_THOUSAND)
-                    .await;
-            })
-        });
-        group.throughput(Throughput::Elements(TEN_THOUSAND as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc", tx_count), &tx_count, |b, i| {
-            b.to_async(get_runtime()).iter(async || {
-                let (tx, rx) = crossfire::mpmc::bounded_async(1);
-                _crossfire_bounded_async(_crossfire_atx_clone(tx, *i), vec![rx], TEN_THOUSAND)
-                    .await;
-            })
-        });
+        bench_bounded_async!(
+            group,
+            "mpsc",
+            tx_count,
+            1,
+            mpsc::bounded_async,
+            1,
+            TEN_THOUSAND,
+            10,
+            100
+        );
+    }
+    for tx_count in [2, 4, 8, 16] {
+        bench_bounded_async!(
+            group,
+            "mpmc",
+            tx_count,
+            1,
+            mpmc::bounded_async,
+            1,
+            TEN_THOUSAND,
+            10,
+            100
+        );
     }
     group.finish();
 }
 
-fn bench_crossfire_bounded_1_async_mpmc(c: &mut Criterion) {
+fn crossfire_bounded_1_async_n_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_bounded_1_async_n_n");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(20));
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
-        let param = Concurrency { tx_count: input.0, rx_count: input.1 };
-        group.throughput(Throughput::Elements(TEN_THOUSAND as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc", &param), &param, |b, i| {
-            b.to_async(get_runtime()).iter(async || {
-                let (tx, rx) = crossfire::mpmc::bounded_async(1);
-                _crossfire_bounded_async(
-                    _crossfire_atx_clone(tx, i.tx_count),
-                    _crossfire_arx_clone(rx, i.rx_count),
-                    TEN_THOUSAND,
-                )
-                .await;
-            })
-        });
+        bench_bounded_async!(
+            group,
+            "mpsc",
+            input.0,
+            input.1,
+            mpsc::bounded_async,
+            1,
+            TEN_THOUSAND,
+            10,
+            100
+        );
+    }
+    for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
+        bench_bounded_async!(
+            group,
+            "mpmc",
+            input.0,
+            input.1,
+            mpmc::bounded_async,
+            1,
+            TEN_THOUSAND,
+            10,
+            100
+        );
     }
     group.finish();
 }
 
-fn bench_crossfire_bounded_100_async_mpsc(c: &mut Criterion) {
+fn crossfire_bounded_100_async_1_1(c: &mut Criterion) {
+    let mut group = c.benchmark_group("crossfire_bounded_100_async_1_1");
+    bench_bounded_async!(group, "spsc", 1, 1, spsc::bounded_async, 100, ONE_MILLION);
+    bench_bounded_async!(group, "mpsc", 1, 1, mpsc::bounded_async, 100, ONE_MILLION);
+    bench_bounded_async!(group, "mpmc", 1, 1, mpmc::bounded_async, 100, ONE_MILLION);
+    group.finish();
+}
+
+fn crossfire_bounded_100_async_n_1(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_bounded_100_async_n_1");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(20));
     for tx_count in [1, 2, 4, 8, 16] {
-        group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc", tx_count), &tx_count, |b, i| {
-            b.to_async(get_runtime()).iter(async || {
-                let (tx, rx) = crossfire::mpsc::bounded_async(100);
-                _crossfire_bounded_async(_crossfire_atx_clone(tx, *i), vec![rx], ONE_MILLION).await;
-            })
-        });
-        group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc", tx_count), &tx_count, |b, i| {
-            b.to_async(get_runtime()).iter(async || {
-                let (tx, rx) = crossfire::mpmc::bounded_async(100);
-                _crossfire_bounded_async(_crossfire_atx_clone(tx, *i), vec![rx], ONE_MILLION).await;
-            })
-        });
+        bench_bounded_async!(group, "mpsc", tx_count, 1, mpsc::bounded_async, 100, ONE_MILLION);
+    }
+
+    for tx_count in [1, 2, 4, 8, 16] {
+        bench_bounded_async!(group, "mpmc", tx_count, 1, mpmc::bounded_async, 100, ONE_MILLION);
     }
     group.finish();
 }
 
-fn bench_crossfire_bounded_100_async_mpmc(c: &mut Criterion) {
+fn crossfire_bounded_100_async_n_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_bounded_100_async_n_n");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(20));
-    group.throughput(Throughput::Elements(ONE_MILLION as u64));
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
-        let param = Concurrency { tx_count: input.0, rx_count: input.1 };
-        group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc", &param), &param, |b, i| {
-            b.to_async(get_runtime()).iter(async || {
-                let (tx, rx) = crossfire::mpmc::bounded_async(100);
-                _crossfire_bounded_async(
-                    _crossfire_atx_clone(tx, i.tx_count),
-                    _crossfire_arx_clone(rx, i.rx_count),
-                    ONE_MILLION,
-                )
-                .await;
-            })
-        });
+        bench_bounded_async!(
+            group,
+            "mpmc",
+            input.0,
+            input.1,
+            mpmc::bounded_async,
+            100,
+            ONE_MILLION
+        );
     }
     group.finish();
 }
 
-fn bench_crossfire_unbounded_blocking_1_1(c: &mut Criterion) {
+fn crossfire_unbounded_blocking_1_1(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_unbounded_blocking_1_1");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(10));
-    group.throughput(Throughput::Elements(ONE_MILLION as u64));
-    group.bench_function("spsc 1x1", |b| {
-        b.iter(move || {
-            let (tx, rx) = crossfire::spsc::unbounded_blocking();
-            _crossfire_blocking(vec![tx], vec![rx], ONE_MILLION);
-        })
-    });
-    group.bench_function("mpsc 1x1", |b| {
-        b.iter(move || {
-            let (tx, rx) = crossfire::mpsc::unbounded_blocking();
-            _crossfire_blocking(vec![tx], vec![rx], ONE_MILLION);
-        })
-    });
-
-    group.bench_function("mpmc 1x1", |b| {
-        b.iter(move || {
-            let (tx, rx) = crossfire::mpmc::unbounded_blocking();
-            _crossfire_blocking(vec![tx], vec![rx], ONE_MILLION);
-        })
-    });
+    bench_unbounded_blocking!(group, "spsc", 1, 1, spsc::unbounded_blocking, ONE_MILLION);
+    bench_unbounded_blocking!(group, "mpsc", 1, 1, mpsc::unbounded_blocking, ONE_MILLION);
+    bench_unbounded_blocking!(group, "mpmc", 1, 1, mpmc::unbounded_blocking, ONE_MILLION);
     group.finish();
 }
 
-fn bench_crossfire_unbounded_blocking_mpsc(c: &mut Criterion) {
+fn crossfire_unbounded_blocking_n_1(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_unbounded_blocking_n_1");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(20));
-    group.throughput(Throughput::Elements(ONE_MILLION as u64));
     for input in [1, 2, 4, 8, 16] {
-        let param = Concurrency { tx_count: input, rx_count: 1 };
-        group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc", &param), &param, |b, i| {
-            b.iter(move || {
-                let (tx, rx) = crossfire::mpsc::unbounded_blocking();
-                _crossfire_blocking(_crossfire_btx_clone(tx, i.tx_count), vec![rx], ONE_MILLION);
-            })
-        });
+        bench_unbounded_blocking!(group, "mpsc", input, 1, mpsc::unbounded_blocking, ONE_MILLION);
     }
     for input in [1, 2, 4, 8, 16] {
-        let param = Concurrency { tx_count: input, rx_count: 1 };
-        group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc", &param), &param, |b, i| {
-            b.iter(move || {
-                let (tx, rx) = crossfire::mpmc::unbounded_blocking();
-                _crossfire_blocking(_crossfire_btx_clone(tx, i.tx_count), vec![rx], ONE_MILLION);
-            })
-        });
+        bench_unbounded_blocking!(group, "mpmc", input, 1, mpmc::unbounded_blocking, ONE_MILLION);
     }
     group.finish();
 }
 
-fn bench_crossfire_unbounded_blocking_mpmc(c: &mut Criterion) {
+fn crossfire_unbounded_blocking_n_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_unbounded_blocking_n_n");
-    group.significance_level(0.1).sample_size(50);
-    group.measurement_time(Duration::from_secs(20));
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
-        let param = Concurrency { tx_count: input.0, rx_count: input.1 };
-        group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_function(format!("{}", param).to_string(), |b| {
-            b.iter(move || {
-                let (tx, rx) = crossfire::mpmc::unbounded_blocking();
-                _crossfire_blocking(
-                    _crossfire_btx_clone(tx, input.0),
-                    _crossfire_brx_clone(rx, input.1),
-                    ONE_MILLION,
-                );
-            })
-        });
+        bench_unbounded_blocking!(
+            group,
+            "mpmc",
+            input.0,
+            input.1,
+            mpmc::unbounded_blocking,
+            ONE_MILLION
+        );
     }
     group.finish();
 }
 
-fn bench_crossfire_unbounded_async_1_1(c: &mut Criterion) {
+fn crossfire_unbounded_async_1_1(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_unbounded_async_1_1");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(10));
-    group.throughput(Throughput::Elements(ONE_MILLION as u64));
-    group.bench_function("spsc 1x1", |b| {
-        b.to_async(get_runtime()).iter(async || {
-            let (tx, rx) = crossfire::spsc::unbounded_async();
-            _crossfire_blocking_async(vec![tx], vec![rx], ONE_MILLION).await;
-        })
-    });
-    group.bench_function("mpsc 1x1", |b| {
-        b.to_async(get_runtime()).iter(async || {
-            let (tx, rx) = crossfire::mpsc::unbounded_async();
-            _crossfire_blocking_async(vec![tx], vec![rx], ONE_MILLION).await;
-        })
-    });
-
-    group.bench_function("mpmc 1x1", |b| {
-        b.to_async(get_runtime()).iter(async || {
-            let (tx, rx) = crossfire::mpmc::unbounded_async();
-            _crossfire_blocking_async(vec![tx], vec![rx], ONE_MILLION).await;
-        })
-    });
+    bench_unbounded_async!(group, "spsc", 1, 1, spsc::unbounded_async, ONE_MILLION);
+    bench_unbounded_async!(group, "mpsc", 1, 1, mpsc::unbounded_async, ONE_MILLION);
+    bench_unbounded_async!(group, "mpmc", 1, 1, mpmc::unbounded_async, ONE_MILLION);
     group.finish();
 }
 
-fn bench_crossfire_unbounded_async_mpsc(c: &mut Criterion) {
+fn crossfire_unbounded_async_mpsc(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_unbounded_async_n_1");
-    group.significance_level(0.1).sample_size(100);
-    group.measurement_time(Duration::from_secs(20));
-    group.throughput(Throughput::Elements(ONE_MILLION as u64));
     for input in [1, 2, 4, 8, 16] {
-        let param = Concurrency { tx_count: input, rx_count: 1 };
-        group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc", &param), &param, |b, i| {
-            b.to_async(get_runtime()).iter(async || {
-                let (tx, rx) = crossfire::mpsc::unbounded_async();
-                _crossfire_blocking_async(
-                    _crossfire_btx_clone(tx, i.tx_count),
-                    vec![rx],
-                    ONE_MILLION,
-                )
-                .await;
-            })
-        });
+        bench_unbounded_async!(group, "mpsc", input, 1, mpsc::unbounded_async, ONE_MILLION);
     }
     for input in [1, 2, 4, 8, 16] {
-        let param = Concurrency { tx_count: input, rx_count: 1 };
-        group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc", &param), &param, |b, i| {
-            b.to_async(get_runtime()).iter(async || {
-                let (tx, rx) = crossfire::mpmc::unbounded_async();
-                _crossfire_blocking_async(
-                    _crossfire_btx_clone(tx, i.tx_count),
-                    vec![rx],
-                    ONE_MILLION,
-                )
-                .await;
-            })
-        });
+        bench_unbounded_async!(group, "mpmc", input, 1, mpmc::unbounded_async, ONE_MILLION);
     }
     group.finish();
 }
 
-fn bench_crossfire_unbounded_async_mpmc(c: &mut Criterion) {
+fn crossfire_unbounded_async_mpmc(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossfire_unbounded_async_n_n");
-    group.significance_level(0.1).sample_size(50);
-    group.measurement_time(Duration::from_secs(20));
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
-        let param = Concurrency { tx_count: input.0, rx_count: input.1 };
-        group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_function(format!("{}", param).to_string(), |b| {
-            b.to_async(get_runtime()).iter(async || {
-                let (tx, rx) = crossfire::mpmc::unbounded_async();
-                _crossfire_blocking_async(
-                    _crossfire_btx_clone(tx, input.0),
-                    _crossfire_arx_clone(rx, input.1),
-                    ONE_MILLION,
-                )
-                .await;
-            })
-        });
+        bench_unbounded_async!(group, "mpmc", input.0, input.1, mpmc::unbounded_async, ONE_MILLION);
     }
     group.finish();
 }
 
 criterion_group!(
     benches,
-    bench_crossfire_bounded_async_1_1,
-    bench_crossfire_bounded_100_async_mpsc,
-    bench_crossfire_bounded_100_async_mpmc,
-    bench_crossfire_unbounded_async_1_1,
-    bench_crossfire_unbounded_async_mpsc,
-    bench_crossfire_unbounded_async_mpmc,
-    bench_crossfire_bounded_blocking_1_1,
-    bench_crossfire_bounded_1_blocking_mpsc,
-    bench_crossfire_bounded_1_blocking_mpmc,
-    bench_crossfire_bounded_1_async_mpsc,
-    bench_crossfire_bounded_1_async_mpmc,
-    bench_crossfire_bounded_100_blocking_mpsc,
-    bench_crossfire_bounded_100_blocking_mpmc,
-    bench_crossfire_unbounded_blocking_1_1,
-    bench_crossfire_unbounded_blocking_mpsc,
-    bench_crossfire_unbounded_blocking_mpmc,
+    crossfire_bounded_1_blocking_1_1,
+    crossfire_bounded_1_blocking_n_1,
+    crossfire_bounded_1_blocking_n_n,
+    crossfire_bounded_100_blocking_1_1,
+    crossfire_bounded_100_blocking_n_1,
+    crossfire_bounded_100_blocking_n_n,
+    crossfire_unbounded_blocking_1_1,
+    crossfire_unbounded_blocking_n_1,
+    crossfire_unbounded_blocking_n_n,
+    crossfire_bounded_1_async_1_1,
+    crossfire_bounded_1_async_n_1,
+    crossfire_bounded_1_async_n_n,
+    crossfire_bounded_100_async_1_1,
+    crossfire_bounded_100_async_n_1,
+    crossfire_bounded_100_async_n_n,
+    crossfire_unbounded_async_1_1,
+    crossfire_unbounded_async_mpsc,
+    crossfire_unbounded_async_mpmc,
 );
 criterion_main!(benches);

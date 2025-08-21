@@ -30,9 +30,7 @@ rand = "0.9"
 rstest = "0"
 captains-log = {version="0.8", features = ["ringfile"] }
 log = "0"
-atomic-waitgroup = "0"
-criterion = { version="0.6", features = ["async_tokio", "csv_output"] }
-
+criterion2 = { version="3.0.2", features = ["async_tokio"] }
 flume = {version="0.11", features= ["async"] }
 kanal = {version="0.1"}
 
