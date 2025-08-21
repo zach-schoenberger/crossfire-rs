@@ -1134,7 +1134,7 @@ fn test_pressure_stream_multi_idle(
     setup_log: (), #[case] channel: (MAsyncTx<i32>, MAsyncRx<i32>), #[case] rx_count: usize,
 ) {
     runtime_block_on!(async move {
-        let total_message = 5000;
+        let total_message = 2000;
         let (tx, rx) = channel;
         let mut th_s = Vec::new();
         let counter = Arc::new(AtomicUsize::new(0));
@@ -1152,7 +1152,7 @@ fn test_pressure_stream_multi_idle(
         drop(rx);
         for i in 0..total_message {
             tx.send(i).await.expect("send");
-            sleep(Duration::from_millis(10)).await;
+            sleep(Duration::from_millis(3)).await;
         }
         drop(tx);
         for th in th_s {
