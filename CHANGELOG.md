@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.21] - 2025-08-21
+
+### Added
+
+- Add clone_to_vec() method in async / blocking tx/rx trait
+
+### Fixed
+
+- AsyncSink: Fix typo in clear waker on drop (Does not affect stability)
+
 ## [2.0.20] - 2025-08-17
 
 ### Added
