@@ -170,7 +170,7 @@ impl RegistryTrait for RegistryMulti {
 
     #[inline(always)]
     fn fire(&self) {
-        let seq = self.seq.load(Ordering::Acquire);
+        let seq = self.seq.load(Ordering::Acquire).wrapping_sub(1);
         while let Some(weak) = self.queue.pop() {
             if let Some(waker) = weak.upgrade() {
                 if waker.wake() {
@@ -179,7 +179,7 @@ impl RegistryTrait for RegistryMulti {
                 // The latest seq in RegistryMulti is always last_waker.get_seq() +1
                 // Because some waker (issued by sink / stream) might be INIT all the time,
                 // prevent to dead loop situation when they are wake up and re-register again.
-                if waker.get_seq().wrapping_add(1) == seq {
+                if waker.get_seq() >= seq {
                     return;
                 }
             }
