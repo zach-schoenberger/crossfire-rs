@@ -399,6 +399,8 @@ pub trait AsyncTxTrait<T: Unpin + Send + 'static>:
         self.as_ref().is_disconnected()
     }
 
+    fn clone_to_vec(self, count: usize) -> Vec<Self>;
+
     /// Send message. Will await when channel is full.
     ///
     /// Returns `Ok(())` on successful.
@@ -424,6 +426,12 @@ pub trait AsyncTxTrait<T: Unpin + Send + 'static>:
 }
 
 impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for AsyncTx<T> {
+    #[inline(always)]
+    fn clone_to_vec(self, count: usize) -> Vec<Self> {
+        assert_eq!(count, 1);
+        vec![self]
+    }
+
     #[inline(always)]
     fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
         AsyncTx::try_send(self, item)
@@ -534,6 +542,16 @@ impl<T> Deref for MAsyncTx<T> {
 }
 
 impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for MAsyncTx<T> {
+    #[inline(always)]
+    fn clone_to_vec(self, count: usize) -> Vec<Self> {
+        let mut v = Vec::with_capacity(count);
+        for _ in 0..count - 1 {
+            v.push(self.clone());
+        }
+        v.push(self);
+        v
+    }
+
     #[inline(always)]
     fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
         self.0.try_send(item)

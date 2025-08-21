@@ -413,9 +413,17 @@ pub trait AsyncRxTrait<T: Unpin + Send + 'static>:
     fn is_disconnected(&self) -> bool {
         self.as_ref().is_disconnected()
     }
+
+    fn clone_to_vec(self, count: usize) -> Vec<Self>;
 }
 
 impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
+    #[inline(always)]
+    fn clone_to_vec(self, _count: usize) -> Vec<Self> {
+        assert_eq!(_count, 1);
+        vec![self]
+    }
+
     #[inline(always)]
     fn recv<'a>(&'a self) -> ReceiveFuture<'a, T> {
         AsyncRx::recv(self)
@@ -527,6 +535,16 @@ impl<T> Deref for MAsyncRx<T> {
 }
 
 impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for MAsyncRx<T> {
+    #[inline(always)]
+    fn clone_to_vec(self, count: usize) -> Vec<Self> {
+        let mut v = Vec::with_capacity(count);
+        for _ in 0..count - 1 {
+            v.push(self.clone());
+        }
+        v.push(self);
+        v
+    }
+
     #[inline(always)]
     fn try_recv(&self) -> Result<T, TryRecvError> {
         self.0.try_recv()

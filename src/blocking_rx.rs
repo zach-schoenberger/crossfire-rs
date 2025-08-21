@@ -224,7 +224,7 @@ impl<T> From<MAsyncRx<T>> for MRx<T> {
 
 /// For writing generic code with MRx & Rx
 pub trait BlockingRxTrait<T: Send + 'static>:
-    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared>
+    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared> + Sized
 {
     /// Receive message, will block when channel is empty.
     ///
@@ -269,9 +269,17 @@ pub trait BlockingRxTrait<T: Send + 'static>:
     fn is_disconnected(&self) -> bool {
         self.as_ref().is_disconnected()
     }
+
+    fn clone_to_vec(self, count: usize) -> Vec<Self>;
 }
 
 impl<T: Send + 'static> BlockingRxTrait<T> for Rx<T> {
+    #[inline(always)]
+    fn clone_to_vec(self, _count: usize) -> Vec<Self> {
+        assert_eq!(_count, 1);
+        vec![self]
+    }
+
     #[inline(always)]
     fn recv<'a>(&'a self) -> Result<T, RecvError> {
         Rx::recv(self)
@@ -309,6 +317,16 @@ impl<T: Send + 'static> BlockingRxTrait<T> for Rx<T> {
 }
 
 impl<T: Send + 'static> BlockingRxTrait<T> for MRx<T> {
+    #[inline(always)]
+    fn clone_to_vec(self, count: usize) -> Vec<Self> {
+        let mut v = Vec::with_capacity(count);
+        for _ in 0..count - 1 {
+            v.push(self.clone());
+        }
+        v.push(self);
+        v
+    }
+
     #[inline(always)]
     fn recv<'a>(&'a self) -> Result<T, RecvError> {
         self.0.recv()

@@ -203,7 +203,7 @@ impl<T> MTx<T> {
     }
 }
 
-impl<T: Unpin> Clone for MTx<T> {
+impl<T> Clone for MTx<T> {
     #[inline]
     fn clone(&self) -> Self {
         let inner = &self.0;
@@ -224,7 +224,7 @@ impl<T> Deref for MTx<T> {
 
 /// For writing generic code with MTx & Tx
 pub trait BlockingTxTrait<T: Send + 'static>:
-    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared>
+    Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared> + Sized
 {
     /// Send message. Will block when channel is full.
     ///
@@ -269,9 +269,17 @@ pub trait BlockingTxTrait<T: Send + 'static>:
     fn is_disconnected(&self) -> bool {
         self.as_ref().is_disconnected()
     }
+
+    fn clone_to_vec(self, count: usize) -> Vec<Self>;
 }
 
 impl<T: Send + 'static> BlockingTxTrait<T> for Tx<T> {
+    #[inline(always)]
+    fn clone_to_vec(self, _count: usize) -> Vec<Self> {
+        assert_eq!(_count, 1);
+        vec![self]
+    }
+
     #[inline(always)]
     fn send(&self, item: T) -> Result<(), SendError<T>> {
         Tx::send(self, item)
@@ -309,6 +317,16 @@ impl<T: Send + 'static> BlockingTxTrait<T> for Tx<T> {
 }
 
 impl<T: Send + 'static> BlockingTxTrait<T> for MTx<T> {
+    #[inline(always)]
+    fn clone_to_vec(self, count: usize) -> Vec<Self> {
+        let mut v = Vec::with_capacity(count);
+        for _ in 0..count - 1 {
+            v.push(self.clone());
+        }
+        v.push(self);
+        v
+    }
+
     #[inline(always)]
     fn send(&self, item: T) -> Result<(), SendError<T>> {
         self.0.send(item)
