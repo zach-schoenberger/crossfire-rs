@@ -28,7 +28,7 @@ impl ChannelShared {
     /// Return true if all the senders or receivers are dropped
     #[inline(always)]
     pub fn is_disconnected(&self) -> bool {
-        self.closed.load(Ordering::Acquire)
+        self.closed.load(Ordering::SeqCst)
     }
 
     /// Get the count of alive senders
