@@ -195,6 +195,7 @@ impl WakerCell {
         self.0.put(waker.0);
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub fn exists(&self) -> bool {
         self.0.exists()

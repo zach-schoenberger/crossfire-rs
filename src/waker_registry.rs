@@ -108,11 +108,7 @@ impl RegistryTrait for RegistrySingle {
     /// return waker queue size
     #[inline(always)]
     fn len(&self) -> usize {
-        if self.cell.exists() {
-            1
-        } else {
-            0
-        }
+        0
     }
 }
 
