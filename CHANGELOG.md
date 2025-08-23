@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.23] - 2025-08-23
+
+### Fixed
+
+- Change is_disconnected() to SeqCst
+
 ## [2.0.22] - 2025-08-21
 
 ### Fixed
