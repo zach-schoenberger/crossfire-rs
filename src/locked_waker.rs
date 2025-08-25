@@ -69,14 +69,17 @@ impl LockedWaker {
     }
 
     #[inline(always)]
-    pub(crate) fn commit(&self) {
+    pub(crate) fn commit(&self) -> bool {
         // Content with wake() on the other-side
-        let _ = self.0.state.compare_exchange(
+        match self.0.state.compare_exchange(
             WakerState::INIT as u8,
             WakerState::WAITING as u8,
             Ordering::SeqCst,
             Ordering::Relaxed,
-        );
+        ) {
+            Ok(_) => return true,
+            Err(_state) => return false,
+        }
     }
 
     // return is_already waked
@@ -87,7 +90,7 @@ impl LockedWaker {
 
     #[inline(always)]
     pub(crate) fn get_state(&self) -> u8 {
-        self.0.state.load(Ordering::Acquire)
+        self.0.state.load(Ordering::SeqCst)
     }
 
     #[inline(always)]

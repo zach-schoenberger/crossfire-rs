@@ -78,7 +78,7 @@ impl ChannelShared {
     ) -> bool {
         let _waker = if let Some(waker) = o_waker.as_ref() {
             let state = waker.get_state();
-            if state == WakerState::WAITING as u8 {
+            if state <= WakerState::WAITING as u8 {
                 // which is not woken, can be reuse.
                 // https://github.com/frostyplanet/crossfire-rs/issues/14
                 if waker.will_wake(ctx) {
@@ -109,7 +109,7 @@ impl ChannelShared {
     ) -> bool {
         let _waker = if let Some(waker) = o_waker.as_ref() {
             let state = waker.get_state();
-            if state == WakerState::WAITING as u8 {
+            if state <= WakerState::WAITING as u8 {
                 // which is not woken, can be reuse.
                 // https://github.com/frostyplanet/crossfire-rs/issues/14
                 if waker.will_wake(ctx) {
@@ -118,9 +118,6 @@ impl ChannelShared {
                     self.senders.cancel_waker(waker);
                     LockedWaker::new(ctx)
                 }
-            } else if state != WakerState::WAKED as u8 {
-                // not possible
-                LockedWaker::new(ctx)
             } else {
                 waker.reset_init();
                 o_waker.take().unwrap()

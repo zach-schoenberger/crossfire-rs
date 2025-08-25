@@ -213,16 +213,17 @@ impl<T> AsyncRx<T> {
                         break; // Check close and return Pending
                     }
                     if let Some(waker) = o_waker.as_ref() {
-                        waker.commit();
+                        if waker.commit() {
+                            break;
+                        }
                     } else {
                         unreachable!();
                     }
-                } else {
-                    if let Some(waker) = o_waker.take() {
-                        self.shared.recvs.cancel_waker(&waker);
-                    }
-                    continue;
                 }
+                if let Some(waker) = o_waker.take() {
+                    self.shared.recvs.cancel_waker(&waker);
+                }
+                continue;
             }
             break;
         }
