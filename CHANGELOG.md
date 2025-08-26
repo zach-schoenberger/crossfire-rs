@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.24] - 2025-08-26
+
+### Fixed
+
+- More strict with the waker status,  issue #34 (spurious wake up, and waker commit)
+
 ## [2.0.23] - 2025-08-23
 
 ### Fixed
