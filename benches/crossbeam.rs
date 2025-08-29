@@ -1,5 +1,6 @@
 use criterion::*;
 use std::thread;
+use std::time::Duration;
 
 mod common;
 use common::*;
@@ -117,6 +118,7 @@ fn _crossbeam_unbounded_sync(tx_count: usize, rx_count: usize, msg_count: usize)
 fn bench_crossbeam_bounded_sync(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossbeam_bounded");
     group.significance_level(0.1).sample_size(50);
+    group.measurement_time(Duration::from_secs(20));
     for input in [1, 2, 4, 8, 16] {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
@@ -146,6 +148,7 @@ fn bench_crossbeam_bounded_sync(c: &mut Criterion) {
 fn bench_crossbeam_unbounded_sync(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossbeam_unbounded");
     group.significance_level(0.1).sample_size(50);
+    group.measurement_time(Duration::from_secs(20));
     for input in [1, 2, 4, 8, 16] {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
