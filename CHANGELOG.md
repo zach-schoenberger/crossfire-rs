@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.25] - 2025-08-29
+
+### Fixed
+
+- More strict with the waker status, issue #34 (use SeqCst in reset_init)
+
 ## [2.0.24] - 2025-08-26
 
 ### Fixed
