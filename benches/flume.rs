@@ -234,7 +234,7 @@ async fn _flume_bounded_async(bound: usize, tx_count: usize, rx_count: usize, ms
 }
 
 fn bench_flume_bounded_sync(c: &mut Criterion) {
-    let mut group = c.benchmark_group("flume_bounded_sync");
+    let mut group = c.benchmark_group("flume_bounded_blocking");
     group.significance_level(0.1).sample_size(50);
     group.throughput(Throughput::Elements(ONE_MILLION as u64));
     group.measurement_time(Duration::from_secs(15));
@@ -271,7 +271,7 @@ fn bench_flume_unbounded_async(c: &mut Criterion) {
     for input in [(1, 1), (2, 1), (4, 1), (8, 1), (16, 1)] {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc unbounded", &param), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpsc", &param), &param, |b, i| {
             b.to_async(get_runtime())
                 .iter(|| _flume_unbounded_async(i.tx_count, i.rx_count, ONE_MILLION))
         });
@@ -279,7 +279,7 @@ fn bench_flume_unbounded_async(c: &mut Criterion) {
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc unbounded", &param), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpmc", &param), &param, |b, i| {
             b.to_async(get_runtime())
                 .iter(|| _flume_unbounded_async(i.tx_count, i.rx_count, ONE_MILLION))
         });
@@ -293,7 +293,7 @@ fn bench_flume_bounded_async(c: &mut Criterion) {
     for input in [(1, 1), (2, 1), (4, 1), (8, 1), (16, 1)] {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(TEN_THOUSAND as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc bound 1", &param), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpsc size 1", &param), &param, |b, i| {
             b.to_async(get_runtime())
                 .iter(|| _flume_bounded_async(1, i.tx_count, i.rx_count, TEN_THOUSAND))
         });
@@ -302,7 +302,7 @@ fn bench_flume_bounded_async(c: &mut Criterion) {
     for input in [(1, 1), (2, 1), (4, 1), (8, 1), (16, 1)] {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc bound 100", &param), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpsc size 100", &param), &param, |b, i| {
             b.to_async(get_runtime())
                 .iter(|| _flume_bounded_async(100, i.tx_count, i.rx_count, ONE_MILLION))
         });
@@ -310,7 +310,7 @@ fn bench_flume_bounded_async(c: &mut Criterion) {
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc bound 100", &param), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpmc size 100", &param), &param, |b, i| {
             b.to_async(get_runtime())
                 .iter(|| _flume_bounded_async(100, i.tx_count, i.rx_count, ONE_MILLION))
         });
@@ -318,20 +318,20 @@ fn bench_flume_bounded_async(c: &mut Criterion) {
 }
 
 fn bench_flume_unbounded_sync(c: &mut Criterion) {
-    let mut group = c.benchmark_group("flume_unbounded_sync");
+    let mut group = c.benchmark_group("flume_unbounded_blocking");
     group.significance_level(0.1).sample_size(50);
     group.measurement_time(Duration::from_secs(20));
     for input in [(1, 1), (2, 1), (4, 1), (8, 1), (16, 1)] {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc unbounded", &param), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpsc", &param), &param, |b, i| {
             b.iter(|| _flume_unbounded_sync(i.tx_count, i.rx_count, ONE_MILLION))
         });
     }
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc unbounded", &param), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpmc", &param), &param, |b, i| {
             b.iter(|| _flume_unbounded_sync(i.tx_count, i.rx_count, ONE_MILLION))
         });
     }

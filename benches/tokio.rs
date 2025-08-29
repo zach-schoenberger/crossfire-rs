@@ -49,7 +49,7 @@ async fn _tokio_unbounded_mpsc(tx_count: usize, msg_count: usize) {
 }
 
 fn bench_tokio_bounded(c: &mut Criterion) {
-    let mut group = c.benchmark_group("tokio_bounded");
+    let mut group = c.benchmark_group("tokio_bounded_100");
     group.significance_level(0.1).sample_size(50);
     group.measurement_time(Duration::from_secs(10));
     for input in [1, 2, 4, 8, 16] {

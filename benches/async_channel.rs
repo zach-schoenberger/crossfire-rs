@@ -127,7 +127,7 @@ fn bench_async_channel_unbounded_async(c: &mut Criterion) {
     for input in [(1, 1), (2, 1), (4, 1), (8, 1), (16, 1)] {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc unbounded", &param), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpsc", &param), &param, |b, i| {
             b.to_async(get_runtime())
                 .iter(|| _async_channel_unbounded_async(i.tx_count, i.rx_count, ONE_MILLION))
         });
@@ -135,7 +135,7 @@ fn bench_async_channel_unbounded_async(c: &mut Criterion) {
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc unbounded", &param), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpmc", &param), &param, |b, i| {
             b.to_async(get_runtime())
                 .iter(|| _async_channel_unbounded_async(i.tx_count, i.rx_count, ONE_MILLION))
         });
@@ -149,7 +149,7 @@ fn bench_async_channel_bounded_async(c: &mut Criterion) {
     for input in [(1, 1), (2, 1), (4, 1), (8, 1), (16, 1)] {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(TEN_THOUSAND as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc bound 1", &param), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpsc size 1", &param), &param, |b, i| {
             b.to_async(get_runtime())
                 .iter(|| _async_channel_bounded_async(1, i.tx_count, i.rx_count, TEN_THOUSAND))
         });
@@ -158,7 +158,7 @@ fn bench_async_channel_bounded_async(c: &mut Criterion) {
     for input in [(1, 1), (2, 1), (4, 1), (8, 1), (16, 1)] {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc bound 100", &param), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpsc size 100", &param), &param, |b, i| {
             b.to_async(get_runtime())
                 .iter(|| _async_channel_bounded_async(100, i.tx_count, i.rx_count, ONE_MILLION))
         });
@@ -166,7 +166,7 @@ fn bench_async_channel_bounded_async(c: &mut Criterion) {
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpmc bound 100", &param), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpmc size 100", &param), &param, |b, i| {
             b.to_async(get_runtime())
                 .iter(|| _async_channel_bounded_async(100, i.tx_count, i.rx_count, ONE_MILLION))
         });

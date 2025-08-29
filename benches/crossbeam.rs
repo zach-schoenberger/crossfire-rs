@@ -115,19 +115,19 @@ fn _crossbeam_unbounded_sync(tx_count: usize, rx_count: usize, msg_count: usize)
 }
 
 fn bench_crossbeam_bounded_sync(c: &mut Criterion) {
-    let mut group = c.benchmark_group("crossbeam_bounded_sync");
+    let mut group = c.benchmark_group("crossbeam_bounded");
     group.significance_level(0.1).sample_size(50);
     for input in [1, 2, 4, 8, 16] {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc bound 1", input), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpsc size 1", input), &param, |b, i| {
             b.iter(|| _crossbeam_bounded_sync(1, i.tx_count, i.rx_count, ONE_MILLION))
         });
     }
     for input in [1, 2, 4, 8, 16] {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
-        group.bench_with_input(BenchmarkId::new("mpsc bound 100", input), &param, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpsc size 100", input), &param, |b, i| {
             b.iter(|| _crossbeam_bounded_sync(100, i.tx_count, i.rx_count, ONE_MILLION))
         });
     }
@@ -135,7 +135,7 @@ fn bench_crossbeam_bounded_sync(c: &mut Criterion) {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(
-            BenchmarkId::new("mpmc bound 100", param.to_string()),
+            BenchmarkId::new("mpmc size 100", param.to_string()),
             &param,
             |b, i| b.iter(|| _crossbeam_bounded_sync(100, i.tx_count, i.rx_count, ONE_MILLION)),
         );
@@ -144,7 +144,7 @@ fn bench_crossbeam_bounded_sync(c: &mut Criterion) {
 }
 
 fn bench_crossbeam_unbounded_sync(c: &mut Criterion) {
-    let mut group = c.benchmark_group("crossbeam_unbounded_sync");
+    let mut group = c.benchmark_group("crossbeam_unbounded");
     group.significance_level(0.1).sample_size(50);
     for input in [1, 2, 4, 8, 16] {
         let param = Concurrency { tx_count: input, rx_count: 1 };
