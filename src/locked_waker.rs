@@ -55,17 +55,17 @@ impl LockedWaker {
 
     #[inline(always)]
     pub(crate) fn get_seq(&self) -> u64 {
-        self.0.seq.load(Ordering::Acquire)
+        self.0.seq.load(Ordering::Relaxed)
     }
 
     #[inline(always)]
     pub(crate) fn set_seq(&self, seq: u64) {
-        self.0.seq.store(seq, Ordering::Release);
+        self.0.seq.store(seq, Ordering::Relaxed);
     }
 
     #[inline(always)]
     pub(crate) fn reset_init(&self) {
-        self.0.state.store(WakerState::INIT as u8, Ordering::Release);
+        self.0.state.store(WakerState::INIT as u8, Ordering::SeqCst);
     }
 
     #[inline(always)]
