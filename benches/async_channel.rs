@@ -1,9 +1,4 @@
 use criterion::*;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
-use std::thread;
 use std::time::Duration;
 
 mod common;
@@ -11,114 +6,118 @@ use common::*;
 
 async fn _async_channel_unbounded_async(tx_count: usize, rx_count: usize, msg_count: usize) {
     let (tx, rx) = async_channel::unbounded();
-    let counter = Arc::new(AtomicUsize::new(0));
-    let mut th_s = Vec::new();
+    let mut th_tx = Vec::new();
+    let mut th_rx = Vec::new();
+    let mut send_counter: usize = 0;
+    let _send_counter = msg_count / tx_count;
     for _tx_i in 0..tx_count {
-        let _counter = counter.clone();
+        send_counter += _send_counter;
         let _tx = tx.clone();
-        th_s.push(tokio::spawn(async move {
-            loop {
-                let i = _counter.fetch_add(1, Ordering::SeqCst);
-                if i < msg_count {
-                    if let Err(e) = _tx.send(i).await {
-                        panic!("send error: {:?}", e);
-                    }
-                } else {
-                    break;
+        th_tx.push(tokio::spawn(async move {
+            for i in 0.._send_counter {
+                if let Err(e) = _tx.send(i).await {
+                    panic!("send error: {:?}", e);
                 }
             }
         }));
     }
     drop(tx);
-    let recv_counter = Arc::new(AtomicUsize::new(0));
+    let mut recv_counter = 0;
     for _ in 0..(rx_count - 1) {
         let _rx = rx.clone();
-        let _recv_counter = recv_counter.clone();
-        th_s.push(tokio::spawn(async move {
+        th_rx.push(tokio::spawn(async move {
+            let mut i = 0;
             loop {
                 match _rx.recv().await {
                     Ok(_) => {
-                        let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
+                        i += 1;
                     }
                     Err(_) => {
                         break;
                     }
                 }
             }
+            i
         }));
     }
     loop {
         match rx.recv().await {
             Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
+                recv_counter += 1;
             }
             Err(_) => {
                 break;
             }
         }
     }
-    for th in th_s {
+    for th in th_tx {
         let _ = th.await;
     }
-    assert!(counter.load(Ordering::Acquire) >= msg_count);
-    assert!(recv_counter.load(Ordering::Acquire) >= msg_count);
+    for th in th_rx {
+        if let Ok(count) = th.await {
+            recv_counter += count;
+        }
+    }
+    assert_eq!(send_counter, recv_counter);
 }
 
 async fn _async_channel_bounded_async(
     bound: usize, tx_count: usize, rx_count: usize, msg_count: usize,
 ) {
     let (tx, rx) = async_channel::bounded(bound);
-    let counter = Arc::new(AtomicUsize::new(0));
-    let mut th_s = Vec::new();
+    let mut th_tx = Vec::new();
+    let mut th_rx = Vec::new();
+    let mut send_counter: usize = 0;
+    let _send_counter = msg_count / tx_count;
     for _tx_i in 0..tx_count {
-        let _counter = counter.clone();
+        send_counter += _send_counter;
         let _tx = tx.clone();
-        th_s.push(tokio::spawn(async move {
-            loop {
-                let i = _counter.fetch_add(1, Ordering::SeqCst);
-                if i < msg_count {
-                    if let Err(e) = _tx.send(i).await {
-                        panic!("send error: {:?}", e);
-                    }
-                } else {
-                    break;
+        th_tx.push(tokio::spawn(async move {
+            for i in 0.._send_counter {
+                if let Err(e) = _tx.send(i).await {
+                    panic!("send error: {:?}", e);
                 }
             }
         }));
     }
     drop(tx);
-    let recv_counter = Arc::new(AtomicUsize::new(0));
+    let mut recv_counter = 0;
     for _ in 0..(rx_count - 1) {
         let _rx = rx.clone();
-        let _recv_counter = recv_counter.clone();
-        th_s.push(tokio::spawn(async move {
+        th_rx.push(tokio::spawn(async move {
+            let mut i = 0;
             loop {
                 match _rx.recv().await {
                     Ok(_) => {
-                        let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
+                        i += 1;
                     }
                     Err(_) => {
                         break;
                     }
                 }
             }
+            i
         }));
     }
     loop {
         match rx.recv().await {
             Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
+                recv_counter += 1;
             }
             Err(_) => {
                 break;
             }
         }
     }
-    for th in th_s {
+    for th in th_tx {
         let _ = th.await;
     }
-    assert!(counter.load(Ordering::Acquire) >= msg_count);
-    assert!(recv_counter.load(Ordering::Acquire) >= msg_count);
+    for th in th_rx {
+        if let Ok(count) = th.await {
+            recv_counter += count;
+        }
+    }
+    assert_eq!(send_counter, recv_counter);
 }
 
 fn bench_async_channel_unbounded_async(c: &mut Criterion) {

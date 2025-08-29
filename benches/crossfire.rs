@@ -1,9 +1,5 @@
 use criterion::*;
 use crossfire::*;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
 use std::thread;
 use std::time::Duration;
 
@@ -119,165 +115,168 @@ macro_rules! bench_unbounded_async {
 fn _crossfire_blocking<T: BlockingTxTrait<usize>, R: BlockingRxTrait<usize>>(
     txs: Vec<T>, mut rxs: Vec<R>, msg_count: usize,
 ) {
-    let send_counter = Arc::new(AtomicUsize::new(0));
-    let recv_counter = Arc::new(AtomicUsize::new(0));
-    let mut th_s = Vec::new();
+    let mut th_tx = Vec::new();
+    let mut th_rx = Vec::new();
+    let mut send_counter: usize = 0;
+    let _send_counter = msg_count / txs.len();
     for _tx in txs {
-        let _send_counter = send_counter.clone();
-        th_s.push(thread::spawn(move || loop {
-            let i = _send_counter.fetch_add(1, Ordering::SeqCst);
-            if i < msg_count {
+        send_counter += _send_counter;
+        th_tx.push(thread::spawn(move || {
+            for i in 0.._send_counter {
                 _tx.send(i).expect("send");
-            } else {
-                break;
             }
         }));
     }
     let rx_count = rxs.len();
     for _ in 0..(rx_count - 1) {
         let _rx = rxs.pop().unwrap();
-        let _recv_counter = recv_counter.clone();
-        th_s.push(thread::spawn(move || loop {
-            match _rx.recv() {
-                Ok(_) => {
-                    let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
-                }
-                Err(_) => {
-                    break;
+        th_rx.push(thread::spawn(move || -> usize {
+            let mut i = 0;
+            loop {
+                match _rx.recv() {
+                    Ok(_) => {
+                        i += 1;
+                    }
+                    Err(_) => {
+                        break;
+                    }
                 }
             }
+            i
         }));
     }
     let rx = rxs.pop().unwrap();
+    let mut recv_counter = 0;
     loop {
         match rx.recv() {
             Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
+                recv_counter += 1;
             }
             Err(_) => {
                 break;
             }
         }
     }
-    for th in th_s {
+    for th in th_tx {
         let _ = th.join();
     }
-    assert!(send_counter.load(Ordering::Acquire) >= msg_count);
-    assert!(recv_counter.load(Ordering::Acquire) >= msg_count);
+    for th in th_rx {
+        recv_counter += th.join().unwrap();
+    }
+    assert_eq!(send_counter, recv_counter);
 }
 
 async fn _crossfire_blocking_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize>>(
     txs: Vec<T>, mut rxs: Vec<R>, msg_count: usize,
 ) {
-    let counter = Arc::new(AtomicUsize::new(0));
-    let mut sender_th_s = Vec::new();
+    let mut send_counter: usize = 0;
+    let _send_counter = msg_count / txs.len();
+    let mut th_tx = Vec::new();
     for tx in txs {
-        let _counter = counter.clone();
-        sender_th_s.push(thread::spawn(move || loop {
-            let i = _counter.fetch_add(1, Ordering::SeqCst);
-            if i < msg_count {
+        send_counter += _send_counter;
+        th_tx.push(thread::spawn(move || {
+            for i in 0.._send_counter {
                 if let Err(e) = tx.send(i) {
                     panic!("send error: {:?}", e);
                 }
-            } else {
-                break;
             }
         }));
     }
-    let recv_counter = Arc::new(AtomicUsize::new(0));
+    let mut recv_counter = 0;
     let rx_count = rxs.len();
-    let mut recv_th_s = Vec::new();
+    let mut th_rx = Vec::new();
     for _ in 0..(rx_count - 1) {
         let _rx = rxs.pop().unwrap();
-        let _recv_counter = recv_counter.clone();
-        recv_th_s.push(tokio::spawn(async move {
+        th_rx.push(tokio::spawn(async move {
+            let mut i = 0;
             loop {
                 match _rx.recv().await {
                     Ok(_) => {
-                        let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
+                        i += 1;
                     }
                     Err(_) => {
                         break;
                     }
                 }
             }
+            i
         }));
     }
     let rx = rxs.pop().unwrap();
     loop {
         match rx.recv().await {
             Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
+                recv_counter += 1;
             }
             Err(_) => {
                 break;
             }
         }
     }
-    for th in recv_th_s {
-        let _ = th.await;
-    }
-    for th in sender_th_s {
+    assert_eq!(rxs.len(), 0);
+    for th in th_tx {
         let _ = th.join();
     }
-    assert!(counter.load(Ordering::Acquire) >= msg_count);
-    assert!(recv_counter.load(Ordering::Acquire) >= msg_count);
+    for th in th_rx {
+        recv_counter += th.await.unwrap();
+    }
+    assert_eq!(send_counter, recv_counter);
 }
 
 async fn _crossfire_bounded_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     txs: Vec<T>, mut rxs: Vec<R>, msg_count: usize,
 ) {
-    let counter = Arc::new(AtomicUsize::new(0));
-    let mut th_s = Vec::new();
+    let mut send_counter: usize = 0;
+    let _send_counter = msg_count / txs.len();
+    let mut th_tx = Vec::new();
+    let mut th_rx = Vec::new();
     for tx in txs {
-        let _counter = counter.clone();
-        th_s.push(tokio::spawn(async move {
-            loop {
-                let i = _counter.fetch_add(1, Ordering::SeqCst);
-                if i < msg_count {
-                    if let Err(e) = tx.send(i).await {
-                        panic!("send error: {:?}", e);
-                    }
-                } else {
-                    break;
+        send_counter += _send_counter;
+        th_tx.push(tokio::spawn(async move {
+            for i in 0.._send_counter {
+                if let Err(e) = tx.send(i).await {
+                    panic!("send error: {:?}", e);
                 }
             }
         }));
     }
-    let recv_counter = Arc::new(AtomicUsize::new(0));
+    let mut recv_counter = 0;
     let rx_count = rxs.len();
     for _ in 0..(rx_count - 1) {
         let _rx = rxs.pop().unwrap();
-        let _recv_counter = recv_counter.clone();
-        th_s.push(tokio::spawn(async move {
+        th_rx.push(tokio::spawn(async move {
+            let mut i = 0;
             loop {
                 match _rx.recv().await {
                     Ok(_) => {
-                        let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
+                        i += 1;
                     }
                     Err(_) => {
                         break;
                     }
                 }
             }
+            i
         }));
     }
     let rx = rxs.pop().unwrap();
     loop {
         match rx.recv().await {
             Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
+                recv_counter += 1;
             }
             Err(_) => {
                 break;
             }
         }
     }
-    for th in th_s {
+    for th in th_tx {
         let _ = th.await;
     }
-    assert!(counter.load(Ordering::Acquire) >= msg_count);
-    assert!(recv_counter.load(Ordering::Acquire) >= msg_count);
+    for th in th_rx {
+        recv_counter += th.await.unwrap();
+    }
+    assert_eq!(send_counter, recv_counter);
 }
 
 fn crossfire_bounded_1_blocking_1_1(c: &mut Criterion) {

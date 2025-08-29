@@ -1,109 +1,117 @@
 use criterion::*;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
 use std::thread;
 
 mod common;
 use common::*;
 
 fn _crossbeam_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_count: usize) {
-    let (tx, rx) = crossbeam::channel::bounded::<usize>(bound);
-    let send_counter = Arc::new(AtomicUsize::new(0));
-    let recv_counter = Arc::new(AtomicUsize::new(0));
-    let mut th_s = Vec::new();
+    let (tx, rx) = crossbeam_channel::bounded::<usize>(bound);
+    let mut th_tx = Vec::new();
+    let mut th_rx = Vec::new();
+    let mut send_counter: usize = 0;
+    let _send_counter = msg_count / tx_count;
     for _ in 0..tx_count {
-        let _send_counter = send_counter.clone();
+        send_counter += _send_counter;
         let _tx = tx.clone();
-        th_s.push(thread::spawn(move || loop {
-            let i = _send_counter.fetch_add(1, Ordering::SeqCst);
-            if i < msg_count {
+        th_tx.push(thread::spawn(move || {
+            for i in 0.._send_counter {
                 _tx.send(i).expect("send");
-            } else {
-                break;
             }
         }));
     }
     drop(tx);
+    let mut recv_counter = 0;
     for _ in 0..(rx_count - 1) {
         let _rx = rx.clone();
-        let _recv_counter = recv_counter.clone();
-        th_s.push(thread::spawn(move || loop {
-            match _rx.recv() {
-                Ok(_) => {
-                    let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
-                }
-                Err(_) => {
-                    break;
+        th_rx.push(thread::spawn(move || -> usize {
+            let mut i = 0;
+            loop {
+                match _rx.recv() {
+                    Ok(_) => {
+                        i += 1;
+                    }
+                    Err(_) => {
+                        break;
+                    }
                 }
             }
+            i
         }));
     }
     loop {
         match rx.recv() {
             Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
+                recv_counter += 1;
             }
             Err(_) => {
                 break;
             }
         }
     }
-    for th in th_s {
+    for th in th_tx {
         let _ = th.join();
     }
-    assert!(send_counter.load(Ordering::Acquire) >= msg_count);
-    assert!(recv_counter.load(Ordering::Acquire) >= msg_count);
+    for th in th_rx {
+        if let Ok(count) = th.join() {
+            recv_counter += count;
+        }
+    }
+    assert_eq!(send_counter, recv_counter);
 }
 
 fn _crossbeam_unbounded_sync(tx_count: usize, rx_count: usize, msg_count: usize) {
     let (tx, rx) = crossbeam_channel::unbounded::<usize>();
-    let send_counter = Arc::new(AtomicUsize::new(0));
-    let recv_counter = Arc::new(AtomicUsize::new(0));
-    let mut th_s = Vec::new();
+    let mut th_tx = Vec::new();
+    let mut th_rx = Vec::new();
+    let mut send_counter: usize = 0;
+    let _send_counter = msg_count / tx_count;
     for _ in 0..tx_count {
-        let _send_counter = send_counter.clone();
+        send_counter += _send_counter;
         let _tx = tx.clone();
-        th_s.push(thread::spawn(move || loop {
-            let i = _send_counter.fetch_add(1, Ordering::SeqCst);
-            if i < msg_count {
+        th_tx.push(thread::spawn(move || {
+            for i in 0.._send_counter {
                 _tx.send(i).expect("send");
-            } else {
-                break;
             }
         }));
     }
     drop(tx);
+    let mut recv_counter = 0;
     for _ in 0..(rx_count - 1) {
         let _rx = rx.clone();
-        let _recv_counter = recv_counter.clone();
-        th_s.push(thread::spawn(move || loop {
-            match _rx.recv() {
-                Ok(_) => {
-                    let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
-                }
-                Err(_) => {
-                    break;
+        th_rx.push(thread::spawn(move || -> usize {
+            let mut i = 0;
+            loop {
+                match _rx.recv() {
+                    Ok(_) => {
+                        i += 1;
+                    }
+                    Err(_) => {
+                        break;
+                    }
                 }
             }
+            i
         }));
     }
     loop {
         match rx.recv() {
             Ok(_) => {
-                let _ = recv_counter.fetch_add(1, Ordering::SeqCst);
+                recv_counter += 1;
             }
             Err(_) => {
                 break;
             }
         }
     }
-    for th in th_s {
+    for th in th_tx {
         let _ = th.join();
     }
-    assert!(send_counter.load(Ordering::Acquire) >= msg_count);
-    assert!(recv_counter.load(Ordering::Acquire) >= msg_count);
+    for th in th_rx {
+        if let Ok(count) = th.join() {
+            recv_counter += count;
+        }
+    }
+    assert_eq!(send_counter, recv_counter);
 }
 
 fn bench_crossbeam_bounded_sync(c: &mut Criterion) {

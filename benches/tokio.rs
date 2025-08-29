@@ -1,8 +1,4 @@
 use criterion::*;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
 use std::time::Duration;
 
 mod common;
@@ -11,23 +7,17 @@ use common::*;
 async fn _tokio_bounded_mpsc(bound: usize, tx_count: usize, msg_count: usize) {
     let (tx, mut rx) = tokio::sync::mpsc::channel::<usize>(bound);
 
-    let counter = Arc::new(AtomicUsize::new(0));
+    let _send_counter = msg_count / tx_count;
     for _tx_i in 0..tx_count {
         let _tx = tx.clone();
-        let _counter = counter.clone();
         tokio::spawn(async move {
-            loop {
-                let i = _counter.fetch_add(1, Ordering::SeqCst);
-                if i < msg_count {
-                    let _ = _tx.send(i).await;
-                } else {
-                    break;
-                }
+            for i in 0.._send_counter {
+                let _ = _tx.send(i).await;
             }
         });
     }
     drop(tx);
-    for _ in 0..msg_count {
+    for _ in 0..(tx_count * _send_counter) {
         if let Some(_msg) = rx.recv().await {
             //    println!("recv {}", _msg);
         } else {
@@ -39,23 +29,17 @@ async fn _tokio_bounded_mpsc(bound: usize, tx_count: usize, msg_count: usize) {
 async fn _tokio_unbounded_mpsc(tx_count: usize, msg_count: usize) {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<usize>();
 
-    let counter = Arc::new(AtomicUsize::new(0));
+    let _send_counter = msg_count / tx_count;
     for _tx_i in 0..tx_count {
         let _tx = tx.clone();
-        let _counter = counter.clone();
         tokio::spawn(async move {
-            loop {
-                let i = _counter.fetch_add(1, Ordering::SeqCst);
-                if i < msg_count {
-                    let _ = _tx.send(i);
-                } else {
-                    break;
-                }
+            for i in 0.._send_counter {
+                let _ = _tx.send(i);
             }
         });
     }
     drop(tx);
-    for _ in 0..msg_count {
+    for _ in 0..(tx_count * _send_counter) {
         if let Some(_msg) = rx.recv().await {
             //    println!("recv {}", _msg);
         } else {
