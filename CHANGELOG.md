@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.26] - 2025-08-30
+
+### Fixed
+
+- waker_registry: Fix hang detect by miri in cancel_waker(), issue #34
+
 ## [2.0.25] - 2025-08-29
 
 ### Fixed
