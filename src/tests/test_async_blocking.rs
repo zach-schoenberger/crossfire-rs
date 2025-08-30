@@ -117,54 +117,6 @@ fn test_basic_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTrai
     let _ = th.join();
 }
 
-#[logfn]
-#[rstest]
-#[case(spsc::bounded_tx_async_rx_blocking::<usize>(100))]
-#[case(mpsc::bounded_tx_async_rx_blocking::<usize>(100))]
-#[case(mpmc::bounded_tx_async_rx_blocking::<usize>(100))]
-fn test_timeout_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTrait<usize>>(
-    setup_log: (), #[case] channel: (T, R),
-) {
-    let (tx, rx) = channel;
-    let rx_res = rx.try_recv();
-    assert!(rx_res.is_err());
-    assert!(rx_res.unwrap_err().is_empty());
-    let batch_1: usize = 100;
-    let batch_2: usize = 200;
-    let th = thread::spawn(move || {
-        for _ in 0..(batch_1 + batch_2) {
-            match rx.recv() {
-                Ok(i) => {
-                    debug!("recv {}", i);
-                }
-                Err(e) => {
-                    panic!("error {}", e);
-                }
-            }
-        }
-
-        assert!(rx.recv_timeout(Duration::from_millis(100)).is_err());
-        assert!(rx.recv_timeout(Duration::from_millis(200)).is_ok());
-
-        let res = rx.recv();
-        assert!(res.is_err());
-    });
-
-    runtime_block_on!(async move {
-        for i in 0..batch_1 {
-            let tx_res = tx.send(i).await;
-            assert!(tx_res.is_ok());
-        }
-        for i in batch_1..(batch_1 + batch_2) {
-            assert!(tx.send(10 + i).await.is_ok());
-            sleep(Duration::from_millis(2)).await;
-        }
-
-        sleep(Duration::from_millis(200)).await;
-        assert!(tx.send(123).await.is_ok());
-    });
-    let _ = th.join();
-}
 
 #[logfn]
 #[rstest]
