@@ -1,10 +1,15 @@
+#[cfg(not(miri))]
+pub const ROUND: usize = 10000;
+#[cfg(miri)]
+pub const ROUND: usize = 20;
+
 #[allow(dead_code)]
 macro_rules! runtime_block_on {
     ($f: expr) => {{
         #[cfg(feature = "async_std")]
         {
             log::info!("run with async_std");
-            async_std::task::block_on($f);
+            async_std::task::block_on($f)
         }
         #[cfg(not(feature = "async_std"))]
         {
@@ -16,7 +21,7 @@ macro_rules! runtime_block_on {
                 log::info!("run with tokio multi thread");
                 tokio::runtime::Builder::new_multi_thread()
             };
-            rt.enable_all().build().unwrap().block_on($f);
+            rt.enable_all().build().unwrap().block_on($f)
         }
     }};
 }
@@ -47,3 +52,18 @@ pub async fn sleep(duration: std::time::Duration) {
         tokio::time::sleep(duration).await;
     }
 }
+
+#[allow(dead_code)]
+macro_rules! async_join_result {
+    ($th: expr) => {{
+        #[cfg(feature = "async_std")]
+        {
+            $th.await
+        }
+        #[cfg(not(feature = "async_std"))]
+        {
+            $th.await.expect("join")
+        }
+    }};
+}
+pub(super) use async_join_result;

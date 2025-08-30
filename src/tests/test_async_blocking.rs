@@ -2,8 +2,6 @@ use super::common::*;
 use crate::*;
 use captains_log::{logfn, *};
 use rstest::*;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -170,9 +168,11 @@ fn test_timeout_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTr
 
 #[logfn]
 #[rstest]
+#[case(mpsc::bounded_tx_async_rx_blocking::<usize>(10), 5)]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(10), 8)]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(10), 100)]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(10), 1000)]
+#[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 5)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 8)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 100)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 1000)]
@@ -180,12 +180,26 @@ fn test_basic_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
 ) {
     let (tx, rx) = channel;
+    let batch_1: usize;
+    let batch_2: usize;
 
+    #[cfg(miri)]
+    {
+        if tx_count > 5 {
+            println!("skip");
+            return;
+        }
+        batch_1 = 10;
+        batch_2 = 20;
+    }
+    #[cfg(not(miri))]
+    {
+        batch_1 = 100;
+        batch_2 = 200;
+    }
     let rx_res = rx.try_recv();
     assert!(rx_res.is_err());
     assert!(rx_res.unwrap_err().is_empty());
-    let batch_1: usize = 100;
-    let batch_2: usize = 200;
     let th = thread::spawn(move || {
         for _ in 0..((batch_1 + batch_2) * tx_count) {
             match rx.recv() {
@@ -244,21 +258,29 @@ fn test_pressure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxT
 ) {
     let (tx, rx) = channel;
 
-    let counter = Arc::new(AtomicUsize::new(0));
-    let round: usize = 1000000;
-    let _round = round;
-    let _counter = counter.clone();
+    let round: usize;
+    #[cfg(miri)]
+    {
+        round = ROUND;
+    }
+    #[cfg(not(miri))]
+    {
+        round = ROUND * 100;
+    }
+
     let th = thread::spawn(move || {
+        let mut count = 0;
         'A: loop {
             match rx.recv() {
                 Ok(i) => {
-                    _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                    count += 1;
                     debug!("recv {}", i);
                 }
                 Err(_) => break 'A,
             }
         }
         debug!("rx exit");
+        count
     });
     runtime_block_on!(async move {
         for i in 0..round {
@@ -269,17 +291,17 @@ fn test_pressure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxT
         }
         debug!("tx exit");
     });
-    let _ = th.join();
-    assert_eq!(counter.as_ref().load(Ordering::Acquire), round);
+    let rx_count = th.join().unwrap();
+    assert_eq!(rx_count, round);
 }
 
 #[logfn]
 #[rstest]
-#[case(mpsc::bounded_tx_async_rx_blocking::<usize>(10), 8)]
+#[case(mpsc::bounded_tx_async_rx_blocking::<usize>(10), 5)]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(10), 10)]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(10), 100)]
 #[case(mpsc::bounded_tx_async_rx_blocking::<usize>(100), 200)]
-#[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 8)]
+#[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 5)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 100)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 10)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(100), 200)]
@@ -287,22 +309,28 @@ fn test_pressure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
 ) {
     let (tx, rx) = channel;
+    #[cfg(miri)]
+    {
+        if tx_count > 5 {
+            println!("skip");
+            return;
+        }
+    }
 
-    let counter = Arc::new(AtomicUsize::new(0));
-    let round: usize = 100000;
-    let _round = round;
-    let _counter = counter.clone();
+    let round: usize = ROUND;
     let th = thread::spawn(move || {
+        let mut count = 0;
         'A: loop {
             match rx.recv() {
                 Ok(_i) => {
-                    _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                    count += 1;
                     debug!("recv {}", _i);
                 }
                 Err(_) => break 'A,
             }
         }
         debug!("rx exit");
+        count
     });
     runtime_block_on!(async move {
         let mut th_co = Vec::new();
@@ -323,13 +351,13 @@ fn test_pressure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
             let _ = th.await;
         }
     });
-    let _ = th.join();
-    assert_eq!(counter.as_ref().load(Ordering::Acquire), round * (tx_count));
+    let rx_count = th.join().unwrap();
+    assert_eq!(rx_count, round * tx_count);
 }
 
 #[logfn]
 #[rstest]
-#[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 8, 8)]
+#[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 5, 5)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 100, 100)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 10, 300)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(100), 300, 300)]
@@ -338,25 +366,31 @@ fn test_pressure_multi_tx_async_multi_rx_blocking(
     #[case] rx_count: usize,
 ) {
     let (tx, rx) = channel;
+    #[cfg(miri)]
+    {
+        if tx_count > 5 || rx_count > 5 {
+            println!("skip");
+            return;
+        }
+    }
 
-    let counter = Arc::new(AtomicUsize::new(0));
-    let round: usize = 100000;
+    let round: usize = ROUND;
     let mut rx_th_s = Vec::new();
     for _rx_i in 0..rx_count {
         let _rx = rx.clone();
-        let _round = round;
-        let _counter = counter.clone();
         rx_th_s.push(thread::spawn(move || {
+            let mut count = 0;
             'A: loop {
                 match _rx.recv() {
                     Ok(i) => {
-                        _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                        count += 1;
                         debug!("recv {} {}", _rx_i, i);
                     }
                     Err(_) => break 'A,
                 }
             }
             debug!("rx {} exit", _rx_i);
+            count
         }));
     }
     drop(rx);
@@ -379,8 +413,9 @@ fn test_pressure_multi_tx_async_multi_rx_blocking(
             let _ = th.await;
         }
     });
+    let mut total_count = 0;
     for th in rx_th_s {
-        let _ = th.join();
+        total_count += th.join().unwrap();
     }
-    assert_eq!(counter.as_ref().load(Ordering::Acquire), round * (tx_count));
+    assert_eq!(total_count, round * tx_count);
 }

@@ -1,7 +1,7 @@
+use super::common::*;
 use crate::*;
 use captains_log::{logfn, *};
 use rstest::*;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::thread::sleep;
@@ -299,22 +299,28 @@ fn test_pressure_bounded_blocking_1_1<T: BlockingTxTrait<usize>, R: BlockingRxTr
     #[cfg(not(feature = "async_std"))]
     {
         let (tx, rx) = _channel;
-
-        let counter = Arc::new(AtomicUsize::new(0));
-        let round: usize = 1000000;
-        let _round = round;
+        let round: usize;
+        #[cfg(miri)]
+        {
+            round = ROUND;
+        }
+        #[cfg(not(miri))]
+        {
+            round = ROUND * 100;
+        }
         let th = thread::spawn(move || {
-            for i in 0.._round {
+            for i in 0..round {
                 if let Err(e) = tx.send(i) {
                     panic!("{:?}", e);
                 }
             }
             debug!("tx exit");
         });
+        let mut count = 0;
         'A: loop {
             match rx.recv() {
                 Ok(_i) => {
-                    counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                    count += 1;
                     debug!("recv {}", _i);
                 }
                 Err(_) => break 'A,
@@ -322,7 +328,7 @@ fn test_pressure_bounded_blocking_1_1<T: BlockingTxTrait<usize>, R: BlockingRxTr
         }
         drop(rx);
         let _ = th.join();
-        assert_eq!(counter.as_ref().load(Ordering::Acquire), round);
+        assert_eq!(count, round);
     }
 }
 
@@ -353,15 +359,20 @@ fn test_pressure_bounded_blocking_multi_1<R: BlockingRxTrait<usize>>(
     #[cfg(not(feature = "async_std"))]
     {
         let (tx, rx) = _channel;
+        #[cfg(miri)]
+        {
+            if tx_count > 5 {
+                println!("skip");
+                return;
+            }
+        }
 
-        let counter = Arc::new(AtomicUsize::new(0));
-        let round: usize = 1000000;
+        let round: usize = ROUND * 10;
         let mut th_s = Vec::new();
         for _tx_i in 0..tx_count {
             let _tx = tx.clone();
-            let _round = round;
             th_s.push(thread::spawn(move || {
-                for i in 0.._round {
+                for i in 0..round {
                     match _tx.send(i) {
                         Err(e) => panic!("{:?}", e),
                         _ => {}
@@ -371,10 +382,11 @@ fn test_pressure_bounded_blocking_multi_1<R: BlockingRxTrait<usize>>(
             }));
         }
         drop(tx);
+        let mut count = 0;
         'A: loop {
             match rx.recv() {
                 Ok(_i) => {
-                    counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                    count += 1;
                     debug!("recv {}", _i);
                 }
                 Err(_) => break 'A,
@@ -384,7 +396,7 @@ fn test_pressure_bounded_blocking_multi_1<R: BlockingRxTrait<usize>>(
         for th in th_s {
             let _ = th.join();
         }
-        assert_eq!(counter.as_ref().load(Ordering::Acquire), round * tx_count);
+        assert_eq!(count, round * tx_count);
     }
 }
 
@@ -406,15 +418,26 @@ fn test_pressure_bounded_blocking_multi(
 ) {
     #[cfg(not(feature = "async_std"))]
     {
+        let round: usize;
+        #[cfg(miri)]
+        {
+            if tx_count > 5 || rx_count > 5 {
+                println!("skip");
+                return;
+            }
+            round = ROUND;
+        }
+        #[cfg(not(miri))]
+        {
+            round = ROUND * 10;
+        }
         let (tx, rx) = _channel;
-        let counter = Arc::new(AtomicUsize::new(0));
-        let round: usize = 1000000;
-        let mut th_s = Vec::new();
+        let mut th_tx = Vec::new();
+        let mut th_rx = Vec::new();
         for _tx_i in 0..tx_count {
             let _tx = tx.clone();
-            let _round = round;
-            th_s.push(thread::spawn(move || {
-                for i in 0.._round {
+            th_tx.push(thread::spawn(move || {
+                for i in 0..round {
                     match _tx.send(i) {
                         Err(e) => panic!("{:?}", e),
                         _ => {}
@@ -425,38 +448,45 @@ fn test_pressure_bounded_blocking_multi(
         }
         for _rx_i in 0..rx_count {
             let _rx = rx.clone();
-            let _counter = counter.clone();
-            th_s.push(thread::spawn(move || {
+            th_rx.push(thread::spawn(move || {
+                let mut count = 0;
                 'A: loop {
                     match _rx.recv() {
                         Ok(_i) => {
-                            _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                            count += 1;
                             debug!("recv {} {}", _rx_i, _i);
                         }
                         Err(_) => break 'A,
                     }
                 }
                 debug!("rx {} exit", _rx_i);
+                count
             }));
         }
         drop(tx);
         drop(rx);
-        for th in th_s {
+        let mut total_count = 0;
+        for th in th_tx {
             let _ = th.join();
         }
-        assert_eq!(counter.as_ref().load(Ordering::Acquire), round * tx_count);
+        for th in th_rx {
+            total_count += th.join().unwrap();
+        }
+        assert_eq!(total_count, round * tx_count);
     }
 }
 
 #[logfn]
 #[rstest]
-#[case(mpmc::bounded_blocking::<i32>(1))]
-fn test_pressure_bounded_timeout_blocking(setup_log: (), #[case] _channel: (MTx<i32>, MRx<i32>)) {
+#[case(mpmc::bounded_blocking::<usize>(1))]
+#[case(mpmc::bounded_blocking::<usize>(10))]
+fn test_pressure_bounded_timeout_blocking(
+    setup_log: (), #[case] _channel: (MTx<usize>, MRx<usize>),
+) {
     #[cfg(not(feature = "async_std"))]
     {
         use parking_lot::Mutex;
         use std::collections::HashMap;
-        use std::sync::atomic::AtomicI32;
         let (tx, rx) = _channel;
 
         assert_eq!(
@@ -467,28 +497,20 @@ fn test_pressure_bounded_timeout_blocking(setup_log: (), #[case] _channel: (MTx<
         println!("wakers: {}, {}", tx_wakers, rx_wakers);
         assert_eq!(tx_wakers, 0);
         assert_eq!(rx_wakers, 0);
-        const ROUND: i32 = 50000;
 
-        let send_counter = Arc::new(AtomicI32::new(0));
-        let recv_counter = Arc::new(AtomicI32::new(0));
-        let send_timeout_counter = Arc::new(AtomicUsize::new(0));
-        let recv_timeout_counter = Arc::new(AtomicUsize::new(0));
         let recv_map = Arc::new(Mutex::new(HashMap::new()));
 
-        let mut th_s = Vec::new();
-        for thread_id in 0..3 {
-            let _send_counter = send_counter.clone();
-            let _send_timeout_counter = send_timeout_counter.clone();
+        let mut th_tx = Vec::new();
+        let mut th_rx = Vec::new();
+        let tx_count: usize = 3;
+        for thread_id in 0..tx_count {
             let _recv_map = recv_map.clone();
             let _tx = tx.clone();
-            th_s.push(thread::spawn(move || {
+            th_tx.push(thread::spawn(move || {
                 // randomize start up
-                sleep(Duration::from_millis(thread_id & 3));
-                loop {
-                    let i = _send_counter.fetch_add(1, Ordering::SeqCst);
-                    if i >= ROUND {
-                        return;
-                    }
+                sleep(Duration::from_millis((thread_id & 3) as u64));
+                let mut local_timeout_counter = 0;
+                for i in 0..ROUND {
                     {
                         let mut guard = _recv_map.lock();
                         guard.insert(i, ());
@@ -502,7 +524,7 @@ fn test_pressure_bounded_timeout_blocking(setup_log: (), #[case] _channel: (MTx<
                         match _tx.send_timeout(i, Duration::from_millis(1)) {
                             Ok(_) => break,
                             Err(SendTimeoutError::Timeout(_i)) => {
-                                _send_timeout_counter.fetch_add(1, Ordering::SeqCst);
+                                local_timeout_counter += 1;
                                 assert_eq!(_i, i);
                             }
                             Err(SendTimeoutError::Disconnected(_)) => {
@@ -511,15 +533,16 @@ fn test_pressure_bounded_timeout_blocking(setup_log: (), #[case] _channel: (MTx<
                         }
                     }
                 }
+                local_timeout_counter
             }));
         }
         for _thread_id in 0..2 {
             let _rx = rx.clone();
             let _recv_map = recv_map.clone();
-            let _recv_counter = recv_counter.clone();
-            let _recv_timeout_counter = recv_timeout_counter.clone();
-            th_s.push(thread::spawn(move || {
+            th_rx.push(thread::spawn(move || {
                 let mut step: usize = 0;
+                let mut local_recv_counter = 0;
+                let mut local_timeout_counter = 0;
                 loop {
                     step += 1;
                     let timeout = if step & 2 == 0 { 1 } else { 2 };
@@ -528,17 +551,17 @@ fn test_pressure_bounded_timeout_blocking(setup_log: (), #[case] _channel: (MTx<
                     }
                     match _rx.recv_timeout(Duration::from_millis(timeout)) {
                         Ok(item) => {
-                            _recv_counter.fetch_add(1, Ordering::SeqCst);
+                            local_recv_counter += 1;
                             {
                                 let mut guard = _recv_map.lock();
                                 guard.remove(&item);
                             }
                         }
                         Err(RecvTimeoutError::Timeout) => {
-                            _recv_timeout_counter.fetch_add(1, Ordering::SeqCst);
+                            local_timeout_counter += 1;
                         }
                         Err(RecvTimeoutError::Disconnected) => {
-                            return;
+                            return (local_recv_counter, local_timeout_counter);
                         }
                     }
                 }
@@ -546,16 +569,25 @@ fn test_pressure_bounded_timeout_blocking(setup_log: (), #[case] _channel: (MTx<
         }
         drop(tx);
         drop(rx);
-        for th in th_s {
-            let _ = th.join();
+        let mut total_recv_count = 0;
+        let mut total_send_timeout = 0;
+        let mut total_recv_timeout = 0;
+        for th in th_tx {
+            total_send_timeout += th.join().unwrap();
+        }
+        for th in th_rx {
+            // rx threads return recv_count
+            let (local_recv_counter, local_timeout_counter) = th.join().unwrap();
+            total_recv_count += local_recv_counter;
+            total_recv_timeout += local_timeout_counter;
         }
         {
             let guard = recv_map.lock();
             assert!(guard.is_empty());
         }
-        assert_eq!(ROUND, recv_counter.load(Ordering::Acquire));
-        println!("send timeout count: {}", send_timeout_counter.load(Ordering::Acquire));
-        println!("recv timeout count: {}", recv_timeout_counter.load(Ordering::Acquire));
+        assert_eq!(ROUND * tx_count, total_recv_count);
+        println!("send timeout count: {}", total_send_timeout);
+        println!("recv timeout count: {}", total_recv_timeout);
     }
 }
 

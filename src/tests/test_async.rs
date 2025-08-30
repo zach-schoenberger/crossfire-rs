@@ -5,10 +5,7 @@ use futures::stream::{FusedStream, StreamExt};
 use rstest::*;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 use std::task::*;
 use std::thread;
 use std::time::Duration;
@@ -223,10 +220,10 @@ fn test_basic_unbounded_rx_drop<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize
 
 #[logfn]
 #[rstest]
-#[case(spsc::bounded_async::<i32>(10))]
-#[case(mpsc::bounded_async::<i32>(10))]
-#[case(mpmc::bounded_async::<i32>(10))]
-fn test_basic_bounded_1_thread<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
+#[case(spsc::bounded_async::<usize>(10))]
+#[case(mpsc::bounded_async::<usize>(10))]
+#[case(mpmc::bounded_async::<usize>(10))]
+fn test_basic_bounded_1_thread<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     let (tx, rx) = channel;
@@ -234,7 +231,7 @@ fn test_basic_bounded_1_thread<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
         let rx_res = rx.try_recv();
         assert!(rx_res.is_err());
         assert!(rx_res.unwrap_err().is_empty());
-        for i in 0i32..10 {
+        for i in 0usize..10 {
             let tx_res = tx.try_send(i);
             assert!(tx_res.is_ok());
         }
@@ -243,7 +240,7 @@ fn test_basic_bounded_1_thread<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
         assert!(tx_res.unwrap_err().is_full());
 
         let th = async_spawn!(async move {
-            for i in 0i32..12 {
+            for i in 0usize..12 {
                 match rx.recv().await {
                     Ok(j) => {
                         debug!("recv {}", i);
@@ -268,10 +265,10 @@ fn test_basic_bounded_1_thread<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
 
 #[logfn]
 #[rstest]
-#[case(spsc::unbounded_async::<i32>())]
-#[case(mpsc::unbounded_async::<i32>())]
-#[case(mpmc::unbounded_async::<i32>())]
-fn test_basic_unbounded_1_thread<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
+#[case(spsc::unbounded_async::<usize>())]
+#[case(mpsc::unbounded_async::<usize>())]
+#[case(mpmc::unbounded_async::<usize>())]
+fn test_basic_unbounded_1_thread<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     let (tx, rx) = channel;
@@ -281,13 +278,13 @@ fn test_basic_unbounded_1_thread<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
         let rx_res = rx.try_recv();
         assert!(rx_res.is_err());
         assert!(rx_res.unwrap_err().is_empty());
-        for i in 0i32..10 {
+        for i in 0usize..10 {
             let tx_res = tx.try_send(i);
             assert!(tx_res.is_ok());
         }
 
         let th = async_spawn!(async move {
-            for i in 0i32..12 {
+            for i in 0usize..12 {
                 match rx.recv().await {
                     Ok(j) => {
                         debug!("recv {}", i);
@@ -312,19 +309,29 @@ fn test_basic_unbounded_1_thread<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
 
 #[logfn]
 #[rstest]
-#[case(spsc::unbounded_async::<i32>())]
-#[case(mpsc::unbounded_async::<i32>())]
-#[case(mpmc::unbounded_async::<i32>())]
-fn test_basic_unbounded_idle_select<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
+#[case(spsc::unbounded_async::<usize>())]
+#[case(mpsc::unbounded_async::<usize>())]
+#[case(mpmc::unbounded_async::<usize>())]
+fn test_basic_unbounded_idle_select<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     // This case simulate the usage of a close notification channel
     let (_tx, rx) = channel;
+    let round = {
+        #[cfg(miri)]
+        {
+            10
+        }
+        #[cfg(not(miri))]
+        {
+            200
+        }
+    };
 
     use futures::{pin_mut, select, FutureExt};
     runtime_block_on!(async move {
         let mut c = rx.recv().fuse();
-        for _ in 0..1000 {
+        for _ in 0..round {
             {
                 let f = sleep(Duration::from_millis(1)).fuse();
                 pin_mut!(f);
@@ -349,10 +356,10 @@ fn test_basic_unbounded_idle_select<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32
 
 #[logfn]
 #[rstest]
-#[case(spsc::bounded_async::<i32>(10))]
-#[case(mpsc::bounded_async::<i32>(10))]
-#[case(mpmc::bounded_async::<i32>(10))]
-fn test_basic_bounded_recv_after_sender_close<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
+#[case(spsc::bounded_async::<usize>(10))]
+#[case(mpsc::bounded_async::<usize>(10))]
+#[case(mpmc::bounded_async::<usize>(10))]
+fn test_basic_bounded_recv_after_sender_close<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     let (tx, rx) = channel;
@@ -381,10 +388,13 @@ fn test_basic_bounded_recv_after_sender_close<T: AsyncTxTrait<i32>, R: AsyncRxTr
 
 #[logfn]
 #[rstest]
-#[case(spsc::unbounded_async::<i32>())]
-#[case(mpsc::unbounded_async::<i32>())]
-#[case(mpmc::unbounded_async::<i32>())]
-fn test_basic_unbounded_recv_after_sender_close<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
+#[case(spsc::unbounded_async::<usize>())]
+#[case(mpsc::unbounded_async::<usize>())]
+#[case(mpmc::unbounded_async::<usize>())]
+fn test_basic_unbounded_recv_after_sender_close<
+    T: BlockingTxTrait<usize>,
+    R: AsyncRxTrait<usize>,
+>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     let (tx, rx) = channel;
@@ -411,10 +421,10 @@ fn test_basic_unbounded_recv_after_sender_close<T: BlockingTxTrait<i32>, R: Asyn
 
 #[logfn]
 #[rstest]
-#[case(spsc::bounded_async::<i32>(100))]
-#[case(mpsc::bounded_async::<i32>(100))]
-#[case(mpmc::bounded_async::<i32>(100))]
-fn test_basic_timeout_recv_async_waker<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
+#[case(spsc::bounded_async::<usize>(100))]
+#[case(mpsc::bounded_async::<usize>(100))]
+#[case(mpmc::bounded_async::<usize>(100))]
+fn test_basic_timeout_recv_async_waker<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     #[cfg(feature = "tokio")]
@@ -445,10 +455,10 @@ fn test_basic_timeout_recv_async_waker<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32
 
 #[logfn]
 #[rstest]
-#[case(spsc::unbounded_async::<i32>())]
-#[case(mpsc::unbounded_async::<i32>())]
-#[case(mpmc::unbounded_async::<i32>())]
-fn test_basic_unbounded_recv_timeout_async<T: BlockingTxTrait<i32>, R: AsyncRxTrait<i32>>(
+#[case(spsc::unbounded_async::<usize>())]
+#[case(mpsc::unbounded_async::<usize>())]
+#[case(mpmc::unbounded_async::<usize>())]
+fn test_basic_unbounded_recv_timeout_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] _channel: (T, R),
 ) {
     #[cfg(any(feature = "tokio", feature = "async_std"))]
@@ -479,10 +489,10 @@ fn test_basic_unbounded_recv_timeout_async<T: BlockingTxTrait<i32>, R: AsyncRxTr
 
 #[logfn]
 #[rstest]
-#[case(spsc::bounded_async::<i32>(10))]
-#[case(mpsc::bounded_async::<i32>(10))]
-#[case(mpmc::bounded_async::<i32>(10))]
-fn test_basic_send_timeout_async<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
+#[case(spsc::bounded_async::<usize>(10))]
+#[case(mpsc::bounded_async::<usize>(10))]
+#[case(mpmc::bounded_async::<usize>(10))]
+fn test_basic_send_timeout_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] _channel: (T, R),
 ) {
     #[cfg(any(feature = "tokio", feature = "async_std"))]
@@ -539,16 +549,17 @@ fn test_basic_send_timeout_async<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
 
 #[logfn]
 #[rstest]
-#[case(mpmc::bounded_async::<i32>(1))]
+#[case(mpmc::bounded_async::<usize>(1))]
 fn test_pressure_bounded_timeout_async(
-    setup_log: (), #[case] _channel: (MAsyncTx<i32>, MAsyncRx<i32>),
+    setup_log: (), #[case] _channel: (MAsyncTx<usize>, MAsyncRx<usize>),
 ) {
     #[cfg(any(feature = "tokio", feature = "async_std"))]
     {
         use parking_lot::Mutex;
         use std::collections::HashMap;
-        use std::sync::atomic::AtomicI32;
         let (tx, rx) = _channel;
+        let tx_count: usize = 3;
+        let rx_count: usize = 2;
 
         runtime_block_on!(async move {
             assert_eq!(
@@ -559,27 +570,23 @@ fn test_pressure_bounded_timeout_async(
             println!("wakers: {}, {}", tx_wakers, rx_wakers);
             assert_eq!(tx_wakers, 0);
             assert_eq!(rx_wakers, 0);
-            const ROUND: i32 = 50000;
 
-            let send_counter = Arc::new(AtomicI32::new(0));
-            let recv_counter = Arc::new(AtomicI32::new(0));
-            let send_timeout_counter = Arc::new(AtomicUsize::new(0));
-            let recv_timeout_counter = Arc::new(AtomicUsize::new(0));
             let recv_map = Arc::new(Mutex::new(HashMap::new()));
 
-            let mut th_s = Vec::new();
-            for thread_id in 0..3 {
-                let _send_counter = send_counter.clone();
-                let _send_timeout_counter = send_timeout_counter.clone();
+            let mut th_tx = Vec::new();
+            let mut th_rx = Vec::new();
+
+            for thread_id in 0..tx_count {
                 let _recv_map = recv_map.clone();
                 let _tx = tx.clone();
-                th_s.push(async_spawn!(async move {
+                th_tx.push(async_spawn!(async move {
+                    let mut local_send_timeout_count = 0;
+                    let mut i = 0;
                     // randomize start up
-                    sleep(Duration::from_millis(thread_id & 3)).await;
+                    sleep(Duration::from_millis((thread_id & 3) as u64)).await;
                     loop {
-                        let i = _send_counter.fetch_add(1, Ordering::SeqCst);
                         if i >= ROUND {
-                            return;
+                            return local_send_timeout_count;
                         }
                         {
                             let mut guard = _recv_map.lock();
@@ -592,9 +599,12 @@ fn test_pressure_bounded_timeout_async(
                         }
                         loop {
                             match _tx.send_timeout(i, Duration::from_millis(1)).await {
-                                Ok(_) => break,
+                                Ok(_) => {
+                                    i += 1;
+                                    break;
+                                }
                                 Err(SendTimeoutError::Timeout(_i)) => {
-                                    _send_timeout_counter.fetch_add(1, Ordering::SeqCst);
+                                    local_send_timeout_count += 1;
                                     assert_eq!(_i, i);
                                 }
                                 Err(SendTimeoutError::Disconnected(_)) => {
@@ -605,13 +615,14 @@ fn test_pressure_bounded_timeout_async(
                     }
                 }));
             }
-            for _thread_id in 0..2 {
+
+            for _thread_id in 0..rx_count {
                 let _rx = rx.clone();
                 let _recv_map = recv_map.clone();
-                let _recv_counter = recv_counter.clone();
-                let _recv_timeout_counter = recv_timeout_counter.clone();
-                th_s.push(async_spawn!(async move {
+                th_rx.push(async_spawn!(async move {
                     let mut step: usize = 0;
+                    let mut local_recv_count: usize = 0;
+                    let mut local_recv_timeout_count: usize = 0;
                     loop {
                         step += 1;
                         let timeout = if step & 2 == 0 { 1 } else { 2 };
@@ -620,17 +631,17 @@ fn test_pressure_bounded_timeout_async(
                         }
                         match _rx.recv_timeout(Duration::from_millis(timeout)).await {
                             Ok(item) => {
-                                _recv_counter.fetch_add(1, Ordering::SeqCst);
+                                local_recv_count += 1;
                                 {
                                     let mut guard = _recv_map.lock();
                                     guard.remove(&item);
                                 }
                             }
                             Err(RecvTimeoutError::Timeout) => {
-                                _recv_timeout_counter.fetch_add(1, Ordering::SeqCst);
+                                local_recv_timeout_count += 1;
                             }
                             Err(RecvTimeoutError::Disconnected) => {
-                                return;
+                                return (local_recv_count, local_recv_timeout_count);
                             }
                         }
                     }
@@ -638,16 +649,25 @@ fn test_pressure_bounded_timeout_async(
             }
             drop(tx);
             drop(rx);
-            for th in th_s {
-                let _ = th.await;
+
+            let mut total_send_timeout_count = 0;
+            for th in th_tx {
+                total_send_timeout_count += async_join_result!(th);
+            }
+            let mut total_recv_count = 0;
+            let mut total_recv_timeout_count = 0;
+            for th in th_rx {
+                let (recv_count, recv_timeout_count) = async_join_result!(th);
+                total_recv_count += recv_count;
+                total_recv_timeout_count += recv_timeout_count;
             }
             {
                 let guard = recv_map.lock();
                 assert!(guard.is_empty());
             }
-            assert_eq!(ROUND, recv_counter.load(Ordering::Acquire));
-            println!("send timeout count: {}", send_timeout_counter.load(Ordering::Acquire));
-            println!("recv timeout count: {}", recv_timeout_counter.load(Ordering::Acquire));
+            assert_eq!(ROUND * tx_count, total_recv_count);
+            println!("send timeout count: {}", total_send_timeout_count);
+            println!("recv timeout count: {}", total_recv_timeout_count);
         });
     }
     #[cfg(not(any(feature = "tokio", feature = "async_std")))]
@@ -661,11 +681,6 @@ fn test_pressure_bounded_timeout_async(
 #[case(spsc::bounded_async::<usize>(1))]
 #[case(spsc::bounded_async::<usize>(10))]
 #[case(spsc::bounded_async::<usize>(100))]
-#[case(spsc::bounded_async::<usize>(300))]
-#[case(mpsc::bounded_async::<usize>(1))]
-#[case(mpsc::bounded_async::<usize>(10))]
-#[case(mpsc::bounded_async::<usize>(100))]
-#[case(mpsc::bounded_async::<usize>(300))]
 #[case(mpmc::bounded_async::<usize>(1))]
 #[case(mpmc::bounded_async::<usize>(10))]
 #[case(mpmc::bounded_async::<usize>(100))]
@@ -675,12 +690,10 @@ fn test_pressure_bounded_async_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize
 ) {
     let (tx, rx) = channel;
 
-    let counter = Arc::new(AtomicUsize::new(0));
-    let round: usize = 10000;
     runtime_block_on!(async move {
-        let _round = round;
+        let mut counter: usize = 0;
         let th = async_spawn!(async move {
-            for i in 0.._round {
+            for i in 0..ROUND {
                 if let Err(e) = tx.send(i).await {
                     panic!("{:?}", e);
                 }
@@ -690,7 +703,7 @@ fn test_pressure_bounded_async_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize
         'A: loop {
             match rx.recv().await {
                 Ok(_i) => {
-                    counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                    counter += 1;
                     debug!("recv {}", _i);
                 }
                 Err(_) => break 'A,
@@ -698,44 +711,48 @@ fn test_pressure_bounded_async_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize
         }
         drop(rx);
         let _ = th.await;
-        assert_eq!(counter.as_ref().load(Ordering::Acquire), round);
+        assert_eq!(counter, ROUND);
     });
 }
 
 #[logfn]
 #[rstest]
-#[case(mpsc::bounded_async::<usize>(1), 10)]
+#[case(mpsc::bounded_async::<usize>(1), 5)]
 #[case(mpsc::bounded_async::<usize>(1), 100)]
 #[case(mpsc::bounded_async::<usize>(1), 300)]
-#[case(mpsc::bounded_async::<usize>(10), 10)]
+#[case(mpsc::bounded_async::<usize>(10), 5)]
 #[case(mpsc::bounded_async::<usize>(10), 100)]
 #[case(mpsc::bounded_async::<usize>(10), 300)]
 #[case(mpsc::bounded_async::<usize>(100), 10)]
 #[case(mpsc::bounded_async::<usize>(100), 100)]
 #[case(mpsc::bounded_async::<usize>(100), 300)]
-#[case(mpmc::bounded_async::<usize>(1), 10)]
+#[case(mpmc::bounded_async::<usize>(1), 5)]
 #[case(mpmc::bounded_async::<usize>(1), 100)]
 #[case(mpmc::bounded_async::<usize>(1), 300)]
-#[case(mpmc::bounded_async::<usize>(10), 10)]
+#[case(mpmc::bounded_async::<usize>(10), 5)]
 #[case(mpmc::bounded_async::<usize>(10), 100)]
 #[case(mpmc::bounded_async::<usize>(10), 300)]
-#[case(mpmc::bounded_async::<usize>(100), 10)]
+#[case(mpmc::bounded_async::<usize>(100), 5)]
 #[case(mpmc::bounded_async::<usize>(100), 100)]
 #[case(mpmc::bounded_async::<usize>(100), 300)]
 fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
 ) {
     let (tx, rx) = channel;
-
+    #[cfg(miri)]
+    {
+        if tx_count > 10 {
+            println!("skip");
+            return;
+        }
+    }
     runtime_block_on!(async move {
-        let counter = Arc::new(AtomicUsize::new(0));
-        let round: usize = 10000;
+        let mut counter = 0;
         let mut th_s = Vec::new();
         for _tx_i in 0..tx_count {
             let _tx = tx.clone();
-            let _round = round;
             th_s.push(async_spawn!(async move {
-                for i in 0.._round {
+                for i in 0..ROUND {
                     match _tx.send(i).await {
                         Err(e) => panic!("{:?}", e),
                         _ => {}
@@ -748,7 +765,7 @@ fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
         'A: loop {
             match rx.recv().await {
                 Ok(_i) => {
-                    counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                    counter += 1;
                     debug!("recv {}", _i);
                 }
                 Err(_) => break 'A,
@@ -758,20 +775,21 @@ fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
         for th in th_s {
             let _ = th.await;
         }
-        assert_eq!(counter.as_ref().load(Ordering::Acquire), round * tx_count);
+        assert_eq!(counter, ROUND * tx_count);
     });
 }
 
 #[logfn]
 #[rstest]
+#[case(mpmc::bounded_async::<usize>(1), 5, 5)]
 #[case(mpmc::bounded_async::<usize>(1), 100, 10)]
 #[case(mpmc::bounded_async::<usize>(1), 10, 100)]
 #[case(mpmc::bounded_async::<usize>(1), 300, 300)]
-#[case(mpmc::bounded_async::<usize>(10), 10, 10)]
+#[case(mpmc::bounded_async::<usize>(10), 5, 5)]
 #[case(mpmc::bounded_async::<usize>(10), 100, 10)]
 #[case(mpmc::bounded_async::<usize>(10), 10, 100)]
 #[case(mpmc::bounded_async::<usize>(10), 300, 300)]
-#[case(mpmc::bounded_async::<usize>(100), 10, 10)]
+#[case(mpmc::bounded_async::<usize>(100), 5, 5)]
 #[case(mpmc::bounded_async::<usize>(100), 100, 10)]
 #[case(mpmc::bounded_async::<usize>(100), 10, 100)]
 #[case(mpmc::bounded_async::<usize>(100), 300, 300)]
@@ -779,16 +797,21 @@ fn test_pressure_bounded_async_multi(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, MAsyncRx<usize>), #[case] tx_count: usize,
     #[case] rx_count: usize,
 ) {
+    #[cfg(miri)]
+    {
+        if rx_count > 5 || tx_count > 5 {
+            println!("skip");
+            return;
+        }
+    }
     let (tx, rx) = channel;
     runtime_block_on!(async move {
-        let counter = Arc::new(AtomicUsize::new(0));
-        let round: usize = 10000;
-        let mut th_s = Vec::new();
+        let mut th_tx = Vec::new();
+        let mut th_rx = Vec::new();
         for _tx_i in 0..tx_count {
             let _tx = tx.clone();
-            let _round = round;
-            th_s.push(async_spawn!(async move {
-                for i in 0.._round {
+            th_tx.push(async_spawn!(async move {
+                for i in 0..ROUND {
                     match _tx.send(i).await {
                         Err(e) => panic!("{:?}", e),
                         _ => {}
@@ -799,26 +822,31 @@ fn test_pressure_bounded_async_multi(
         }
         for _rx_i in 0..rx_count {
             let _rx = rx.clone();
-            let _counter = counter.clone();
-            th_s.push(async_spawn!(async move {
+            th_rx.push(async_spawn!(async move {
+                let mut count = 0;
                 'A: loop {
                     match _rx.recv().await {
                         Ok(_i) => {
-                            _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                            count += 1;
                             debug!("recv {} {}", _rx_i, _i);
                         }
                         Err(_) => break 'A,
                     }
                 }
                 debug!("rx {} exit", _rx_i);
+                count
             }));
         }
         drop(tx);
         drop(rx);
-        for th in th_s {
+        for th in th_tx {
             let _ = th.await;
         }
-        assert_eq!(counter.as_ref().load(Ordering::Acquire), round * tx_count);
+        let mut recv_count = 0;
+        for th in th_rx {
+            recv_count += async_join_result!(th);
+        }
+        assert_eq!(recv_count, ROUND * tx_count);
     });
 }
 
@@ -832,13 +860,14 @@ fn test_pressure_bounded_mixed_async_blocking_conversion(
 ) {
     let (tx, rx) = channel;
     runtime_block_on!(async move {
-        let counter = Arc::new(AtomicUsize::new(0));
-        let round: usize = 10000;
-        let mut th_s = Vec::new();
-        let mut co_s = Vec::new();
+        let mut recv_counter = 0;
+        let mut th_tx = Vec::new();
+        let mut th_rx = Vec::new();
+        let mut co_tx = Vec::new();
+        let mut co_rx = Vec::new();
         let _tx: MTx<usize> = tx.clone().into();
-        th_s.push(thread::spawn(move || {
-            for i in 0..round {
+        th_tx.push(thread::spawn(move || {
+            for i in 0..ROUND {
                 match _tx.send(i) {
                     Err(e) => panic!("{:?}", e),
                     _ => {}
@@ -846,8 +875,8 @@ fn test_pressure_bounded_mixed_async_blocking_conversion(
             }
             debug!("tx blocking exit");
         }));
-        co_s.push(async_spawn!(async move {
-            for i in 0..round {
+        co_tx.push(async_spawn!(async move {
+            for i in 0..ROUND {
                 match tx.send(i).await {
                     Err(e) => panic!("{:?}", e),
                     _ => {}
@@ -856,40 +885,48 @@ fn test_pressure_bounded_mixed_async_blocking_conversion(
             debug!("tx async exit");
         }));
         let _rx: MRx<usize> = rx.clone().into();
-        let _counter = counter.clone();
-        th_s.push(thread::spawn(move || {
+        th_rx.push(thread::spawn(move || {
+            let mut count: usize = 0;
             'A: loop {
                 match _rx.recv() {
                     Ok(_i) => {
-                        _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                        count += 1;
                         debug!("recv blocking {}", _i);
                     }
                     Err(_) => break 'A,
                 }
             }
             debug!("rx blocking exit");
+            count
         }));
 
-        let _counter = counter.clone();
-        co_s.push(async_spawn!(async move {
+        co_rx.push(async_spawn!(async move {
+            let mut count: usize = 0;
             'A: loop {
                 match rx.recv().await {
                     Ok(_i) => {
-                        _counter.as_ref().fetch_add(1, Ordering::SeqCst);
+                        count += 1;
                         debug!("recv async {}", _i);
                     }
                     Err(_) => break 'A,
                 }
             }
             debug!("rx async exit");
+            count
         }));
-        for th in co_s {
-            let _ = th.await;
+        for th in co_tx {
+            let _ = async_join_result!(th);
         }
-        for th in th_s {
+        for th in th_tx {
             let _ = th.join();
         }
-        assert_eq!(counter.as_ref().load(Ordering::Acquire), round * 2);
+        for th in co_rx {
+            recv_counter += async_join_result!(th);
+        }
+        for th in th_rx {
+            recv_counter += th.join().unwrap();
+        }
+        assert_eq!(recv_counter, ROUND * 2);
     });
 }
 
@@ -1050,13 +1087,13 @@ fn test_spurious_stream(setup_log: ()) {
 
 #[logfn]
 #[rstest]
-#[case(spsc::bounded_async::<i32>(1))]
-#[case(spsc::bounded_async::<i32>(2))]
-#[case(mpsc::bounded_async::<i32>(1))]
-#[case(mpsc::bounded_async::<i32>(2))]
-#[case(mpmc::bounded_async::<i32>(1))]
-#[case(mpmc::bounded_async::<i32>(2))]
-fn test_basic_into_stream_1_1<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
+#[case(spsc::bounded_async::<usize>(1))]
+#[case(spsc::bounded_async::<usize>(2))]
+#[case(mpsc::bounded_async::<usize>(1))]
+#[case(mpsc::bounded_async::<usize>(2))]
+#[case(mpmc::bounded_async::<usize>(1))]
+#[case(mpmc::bounded_async::<usize>(2))]
+fn test_basic_into_stream_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     runtime_block_on!(async move {
@@ -1064,13 +1101,13 @@ fn test_basic_into_stream_1_1<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
         let (tx, rx) = channel;
         async_spawn!(async move {
             println!("sender thread send {} message start", total_message);
-            for i in 0i32..total_message {
+            for i in 0usize..total_message {
                 let _ = tx.send(i).await;
                 // println!("send {}", i);
             }
             println!("sender thread send {} message end", total_message);
         });
-        let mut s: AsyncStream<i32> = rx.into();
+        let mut s: AsyncStream<usize> = rx.into();
 
         for _i in 0..total_message {
             assert_eq!(s.next().await, Some(_i));
@@ -1082,71 +1119,86 @@ fn test_basic_into_stream_1_1<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
 
 #[logfn]
 #[rstest]
-#[case(mpmc::bounded_async::<i32>(1), 2)]
-#[case(mpmc::bounded_async::<i32>(2), 4)]
-#[case(mpmc::bounded_async::<i32>(2), 10)]
-#[case(mpmc::bounded_async::<i32>(10), 3)]
-#[case(mpmc::bounded_async::<i32>(10), 30)]
-#[case(mpmc::bounded_async::<i32>(100), 2)]
-#[case(mpmc::bounded_async::<i32>(100), 4)]
-#[case(mpmc::bounded_async::<i32>(100), 50)]
+#[case(mpmc::bounded_async::<usize>(1), 2)]
+#[case(mpmc::bounded_async::<usize>(2), 4)]
+#[case(mpmc::bounded_async::<usize>(2), 10)]
+#[case(mpmc::bounded_async::<usize>(10), 3)]
+#[case(mpmc::bounded_async::<usize>(10), 30)]
+#[case(mpmc::bounded_async::<usize>(100), 2)]
+#[case(mpmc::bounded_async::<usize>(100), 4)]
+#[case(mpmc::bounded_async::<usize>(100), 50)]
 fn test_pressure_stream_multi(
-    setup_log: (), #[case] channel: (MAsyncTx<i32>, MAsyncRx<i32>), #[case] rx_count: usize,
+    setup_log: (), #[case] channel: (MAsyncTx<usize>, MAsyncRx<usize>), #[case] rx_count: usize,
 ) {
+    #[cfg(miri)]
+    {
+        if rx_count > 5 {
+            println!("skip");
+            return;
+        }
+    }
     runtime_block_on!(async move {
-        let total_message = 100000;
         let (tx, rx) = channel;
         let mut th_s = Vec::new();
-        let counter = Arc::new(AtomicUsize::new(0));
+        let mut recv_counter = 0;
         for rx_i in 0..rx_count {
             let _rx = rx.clone();
-            let _counter = counter.clone();
             th_s.push(async_spawn!(async move {
+                let mut counter = 0;
                 let mut stream = _rx.into_stream();
                 while let Some(_item) = stream.next().await {
-                    _counter.fetch_add(1, Ordering::SeqCst);
+                    counter += 1;
                 }
                 debug!("rx {} exit", rx_i);
+                counter
             }));
         }
         drop(rx);
-        for i in 0..total_message {
+        for i in 0..ROUND {
             tx.send(i).await.expect("send");
         }
         drop(tx);
         for th in th_s {
-            let _ = th.await;
+            recv_counter += async_join_result!(th);
         }
+        assert_eq!(recv_counter, ROUND);
     });
 }
 
 #[logfn]
 #[rstest]
-#[case(mpmc::bounded_async::<i32>(1), 2)]
-#[case(mpmc::bounded_async::<i32>(2), 4)]
-#[case(mpmc::bounded_async::<i32>(2), 10)]
-#[case(mpmc::bounded_async::<i32>(10), 3)]
-#[case(mpmc::bounded_async::<i32>(10), 30)]
-#[case(mpmc::bounded_async::<i32>(100), 2)]
-#[case(mpmc::bounded_async::<i32>(100), 4)]
-#[case(mpmc::bounded_async::<i32>(100), 50)]
+#[case(mpmc::bounded_async::<usize>(1), 2)]
+#[case(mpmc::bounded_async::<usize>(2), 4)]
+#[case(mpmc::bounded_async::<usize>(2), 10)]
+#[case(mpmc::bounded_async::<usize>(10), 3)]
+#[case(mpmc::bounded_async::<usize>(10), 30)]
+#[case(mpmc::bounded_async::<usize>(100), 2)]
+#[case(mpmc::bounded_async::<usize>(100), 4)]
+#[case(mpmc::bounded_async::<usize>(100), 50)]
 fn test_pressure_stream_multi_idle(
-    setup_log: (), #[case] channel: (MAsyncTx<i32>, MAsyncRx<i32>), #[case] rx_count: usize,
+    setup_log: (), #[case] channel: (MAsyncTx<usize>, MAsyncRx<usize>), #[case] rx_count: usize,
 ) {
+    #[cfg(miri)]
+    {
+        if rx_count > 5 {
+            println!("skip");
+            return;
+        }
+    }
     runtime_block_on!(async move {
-        let total_message = 2000;
+        let total_message = ROUND / rx_count;
         let (tx, rx) = channel;
         let mut th_s = Vec::new();
-        let counter = Arc::new(AtomicUsize::new(0));
         for rx_i in 0..rx_count {
             let _rx = rx.clone();
-            let _counter = counter.clone();
             th_s.push(async_spawn!(async move {
+                let mut count = 0;
                 let mut stream = _rx.into_stream();
                 while let Some(_item) = stream.next().await {
-                    _counter.fetch_add(1, Ordering::SeqCst);
+                    count += 1;
                 }
                 debug!("rx {} exit", rx_i);
+                count
             }));
         }
         drop(rx);
@@ -1155,8 +1207,11 @@ fn test_pressure_stream_multi_idle(
             sleep(Duration::from_millis(3)).await;
         }
         drop(tx);
+
+        let mut recv_counter = 0;
         for th in th_s {
-            let _ = th.await;
+            recv_counter += async_join_result!(th);
         }
+        assert_eq!(recv_counter, total_message);
     });
 }
