@@ -139,6 +139,9 @@ impl RegistryTrait for RegistryMulti {
 
     #[inline(always)]
     fn cancel_waker(&self, waker: &LockedWaker) {
+        if waker.abandon() >= WakerState::WAKED as u8 {
+            return;
+        }
         let seq = waker.get_seq();
         if let Some(waker_ref) = self.queue.pop() {
             waker_ref.try_to_clear(seq);
@@ -151,7 +154,7 @@ impl RegistryTrait for RegistryMulti {
     /// to clear the LockedWakerRef which has been sent to the other side.
     #[inline(always)]
     fn clear_wakers(&self, seq: u64) {
-        if self.checking.swap(true, Ordering::SeqCst) {
+        if self.checking.swap(true, Ordering::Acquire) {
             // Other thread is cleaning
             return;
         }
