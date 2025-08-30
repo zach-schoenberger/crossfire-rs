@@ -29,3 +29,9 @@ jobs:
 
     - name: Run timeout tests with async_std
       run: make test_async_std timeout
+
+    - name: install miri
+      run:  rustup component add --toolchain nightly-x86_64-unknown-linux-gnu miri
+
+    - name: Run miri
+      run: scripts/miri.sh stream
