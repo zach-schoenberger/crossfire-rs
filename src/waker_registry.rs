@@ -132,7 +132,7 @@ impl RegistryMulti {
 impl RegistryTrait for RegistryMulti {
     #[inline(always)]
     fn reg_waker(&self, waker: &LockedWaker) {
-        let seq = self.seq.fetch_add(1, Ordering::Release);
+        let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         waker.set_seq(seq);
         self.queue.push(waker.weak());
     }
@@ -169,7 +169,7 @@ impl RegistryTrait for RegistryMulti {
 
     #[inline(always)]
     fn fire(&self) {
-        let seq = self.seq.load(Ordering::Acquire).wrapping_sub(1);
+        let seq = self.seq.load(Ordering::SeqCst).wrapping_sub(1);
         while let Some(weak) = self.queue.pop() {
             if let Some(waker) = weak.upgrade() {
                 if waker.wake() {
