@@ -164,7 +164,7 @@ fn test_sync() {
             }
         }
         drop(rx);
-        let _ = th.await;
+        let _ = async_join_result!(th);
     });
 }
 
@@ -259,7 +259,7 @@ fn test_basic_bounded_1_thread<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
         sleep(Duration::from_secs(1)).await;
         assert!(tx.send(11).await.is_ok());
         drop(tx);
-        let _ = th.await;
+        let _ = async_join_result!(th);
     });
 }
 
@@ -303,7 +303,7 @@ fn test_basic_unbounded_1_thread<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usiz
         sleep(Duration::from_secs(1)).await;
         assert!(tx.send(11).is_ok());
         drop(tx);
-        let _ = th.await;
+        let _ = async_join_result!(th);
     });
 }
 
@@ -473,7 +473,7 @@ fn test_basic_unbounded_recv_timeout_async<T: BlockingTxTrait<usize>, R: AsyncRx
                 rx.recv_timeout(Duration::from_millis(1)).await.unwrap_err(),
                 RecvTimeoutError::Timeout
             );
-            let _ = th.await;
+            let _ = async_join_result!(th);
             let (tx_wakers, rx_wakers) = rx.as_ref().get_wakers_count();
             println!("wakers: {}, {}", tx_wakers, rx_wakers);
             assert_eq!(tx_wakers, 0);
@@ -538,7 +538,7 @@ fn test_basic_send_timeout_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>
             assert_eq!(tx_wakers, 0);
             assert_eq!(rx_wakers, 0);
             drop(tx);
-            let _ = th.await;
+            let _ = async_join_result!(th);
         });
     }
     #[cfg(not(any(feature = "tokio", feature = "async_std")))]
@@ -710,7 +710,7 @@ fn test_pressure_bounded_async_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize
             }
         }
         drop(rx);
-        let _ = th.await;
+        let _ = async_join_result!(th);
         assert_eq!(counter, ROUND);
     });
 }
@@ -773,7 +773,7 @@ fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
         }
         drop(rx);
         for th in th_s {
-            let _ = th.await;
+            let _ = async_join_result!(th);
         }
         assert_eq!(counter, ROUND * tx_count);
     });
@@ -840,7 +840,7 @@ fn test_pressure_bounded_async_multi(
         drop(tx);
         drop(rx);
         for th in th_tx {
-            let _ = th.await;
+            let _ = async_join_result!(th);
         }
         let mut recv_count = 0;
         for th in th_rx {
@@ -918,7 +918,7 @@ fn test_pressure_bounded_mixed_async_blocking_conversion(
             let _ = async_join_result!(th);
         }
         for th in th_tx {
-            let _ = th.join();
+            let _ = th.join().unwrap();
         }
         for th in co_rx {
             recv_counter += async_join_result!(th);
@@ -1038,7 +1038,7 @@ fn test_spurious_sink(setup_log: ()) {
             println!("recv 1 to make the 2 senders waked");
             assert_eq!(rx.recv().await.expect("recv"), 0);
             for th in th_s {
-                let _ = th.await.expect("join ok");
+                let _ = async_join_result!(th);
             }
         });
     }
@@ -1079,7 +1079,7 @@ fn test_spurious_stream(setup_log: ()) {
             tx.send(1).await.expect("send");
             sleep(Duration::from_secs(2)).await;
             for th in th_s {
-                let _ = th.await.expect("join ok");
+                let _ = async_join_result!(th);
             }
         });
     }

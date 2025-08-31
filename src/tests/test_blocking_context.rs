@@ -196,7 +196,7 @@ fn test_basic_bounded_1_thread<T: BlockingTxTrait<i32>, R: BlockingRxTrait<i32>>
         sleep(Duration::from_secs(1));
         assert!(tx.send(11).is_ok());
         drop(tx);
-        let _ = th.join();
+        let _ = th.join().unwrap();
     }
 }
 
@@ -239,7 +239,7 @@ fn test_basic_unbounded_1_thread<T: BlockingTxTrait<i32>, R: BlockingRxTrait<i32
         sleep(Duration::from_secs(1));
         assert!(tx.send(11).is_ok());
         drop(tx);
-        let _ = th.join();
+        let _ = th.join().unwrap();
     }
 }
 
@@ -327,7 +327,7 @@ fn test_pressure_bounded_blocking_1_1<T: BlockingTxTrait<usize>, R: BlockingRxTr
             }
         }
         drop(rx);
-        let _ = th.join();
+        let _ = th.join().unwrap();
         assert_eq!(count, round);
     }
 }
@@ -394,7 +394,7 @@ fn test_pressure_bounded_blocking_multi_1<R: BlockingRxTrait<usize>>(
         }
         drop(rx);
         for th in th_s {
-            let _ = th.join();
+            let _ = th.join().unwrap();
         }
         assert_eq!(count, round * tx_count);
     }
@@ -467,7 +467,7 @@ fn test_pressure_bounded_blocking_multi(
         drop(rx);
         let mut total_count = 0;
         for th in th_tx {
-            let _ = th.join();
+            let _ = th.join().unwrap();
         }
         for th in th_rx {
             total_count += th.join().unwrap();
@@ -658,7 +658,7 @@ fn _test_drop_msg<M: TestDropMsg, T: BlockingTxTrait<M>, R: BlockingRxTrait<M>>(
     let msg = M::new(ids);
     tx.send(msg).expect("send");
     ids += 1;
-    let rx = th.join();
+    let rx = th.join().unwrap();
     drop(rx);
     assert_eq!(get_drop_counter(), 2);
     let msg = M::new(ids);

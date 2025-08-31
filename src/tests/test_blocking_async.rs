@@ -137,7 +137,7 @@ fn test_basic_1_tx_blocking_1_rx_async<T: BlockingTxTrait<usize>, R: AsyncRxTrai
         assert!(res.is_err());
         debug!("rx close");
     });
-    let _ = th.join();
+    let _ = th.join().unwrap();
 }
 
 #[logfn]
@@ -183,7 +183,7 @@ fn test_pressure_1_tx_blocking_1_rx_async<T: BlockingTxTrait<usize>, R: AsyncRxT
         }
         assert!(rx.recv().await.is_err());
     });
-    let _ = th.join();
+    let _ = th.join().unwrap();
 }
 
 #[logfn]
@@ -248,7 +248,7 @@ fn test_pressure_tx_multi_blocking_1_rx_async<R: AsyncRxTrait<usize>>(
         count
     });
     for th in tx_th_s {
-        let _ = th.join();
+        let _ = th.join().unwrap();
     }
     assert_eq!(rx_count, ROUND * tx_count);
 }
@@ -328,7 +328,7 @@ fn test_pressure_tx_multi_blocking_multi_rx_async(
         total
     });
     for th in tx_th_s {
-        let _ = th.join();
+        let _ = th.join().unwrap();
     }
     assert_eq!(total_count, tx_count * ROUND);
 }

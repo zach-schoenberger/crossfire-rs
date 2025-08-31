@@ -114,9 +114,8 @@ fn test_basic_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTrai
             sleep(Duration::from_millis(2)).await;
         }
     });
-    let _ = th.join();
+    let _ = th.join().unwrap();
 }
-
 
 #[logfn]
 #[rstest]
@@ -185,10 +184,10 @@ fn test_basic_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
         drop(tx);
 
         for th in th_s {
-            let _ = th.await;
+            let _ = async_join_result!(th);
         }
     });
-    let _ = th.join();
+    let _ = th.join().unwrap();
 }
 
 #[logfn]
@@ -300,7 +299,7 @@ fn test_pressure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
         }
         drop(tx);
         for th in th_co {
-            let _ = th.await;
+            let _ = async_join_result!(th);
         }
     });
     let rx_count = th.join().unwrap();
@@ -362,7 +361,7 @@ fn test_pressure_multi_tx_async_multi_rx_blocking(
         }
         drop(tx);
         for th in th_co {
-            let _ = th.await;
+            let _ = async_join_result!(th);
         }
     });
     let mut total_count = 0;
