@@ -431,19 +431,6 @@ fn crossfire_bounded_1_async_n_n(c: &mut Criterion) {
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
         bench_bounded_async!(
             group,
-            "mpsc",
-            input.0,
-            input.1,
-            mpsc::bounded_async,
-            1,
-            TEN_THOUSAND,
-            10,
-            100
-        );
-    }
-    for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
-        bench_bounded_async!(
-            group,
             "mpmc",
             input.0,
             input.1,
