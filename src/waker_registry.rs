@@ -190,15 +190,6 @@ impl RegistryRecv {
         Self::Multi(RegistryMulti::<()>::new())
     }
 
-    #[allow(dead_code)]
-    #[cfg(test)]
-    pub fn is_empty(&self) -> bool {
-        match self {
-            RegistryRecv::Single(inner) => inner.is_empty(),
-            RegistryRecv::Multi(inner) => inner.is_empty(),
-        }
-    }
-
     #[inline(always)]
     pub fn reg_waker(&self, waker: &RecvWaker) {
         debug_assert_eq!(waker.get_state(), WakerState::Init as u8);
@@ -277,12 +268,6 @@ impl<P> RegistrySingle<P> {
     #[inline(always)]
     pub fn new() -> Self {
         Self { cell: WeakCell::new() }
-    }
-
-    #[allow(dead_code)]
-    #[inline(always)]
-    fn is_empty(&self) -> bool {
-        !self.cell.exists()
     }
 
     /// return is_skip

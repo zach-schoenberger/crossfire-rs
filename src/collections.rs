@@ -84,9 +84,10 @@ impl<T> WeakCell<T> {
         Self { ptr: AtomicPtr::new(ptr::null_mut()) }
     }
 
+    #[cfg(test)]
     #[inline(always)]
     pub fn exists(&self) -> bool {
-        self.ptr.load(Ordering::Acquire) != ptr::null_mut()
+        self.ptr.load(Ordering::SeqCst) != ptr::null_mut()
     }
 
     #[inline(always)]
@@ -144,11 +145,10 @@ impl<T> WeakCell<T> {
 #[cfg(test)]
 mod tests {
 
-    use super::*;
-    use std::sync::Arc;
-
     #[test]
     fn test_weak_cell() {
+        use super::*;
+        use std::sync::Arc;
         let cell = WeakCell::new();
         assert!(!cell.exists());
         let item = Arc::new(1);
