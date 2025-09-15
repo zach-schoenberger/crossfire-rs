@@ -1,0 +1,34 @@
+name: miri-dev
+
+on:
+  workflow_dispatch:
+  schedule: [cron: "20 */6 * * *"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_and_test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+          ref: dev
+
+    - name: install miri
+      run:  rustup component add --toolchain nightly-x86_64-unknown-linux-gnu miri
+
+    - name: Run miri tests with log
+      run: scripts/miri.sh --features trace_log
+
+    - name: collect log
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v4
+      with:
+          name: crossfire_miri
+          path: /tmp/crossfire_miri.log
+
+    - name: Run miri tests without log
+      run: scripts/miri.sh
