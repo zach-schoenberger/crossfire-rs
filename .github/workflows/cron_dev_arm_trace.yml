@@ -16,6 +16,11 @@ jobs:
     - uses: actions/checkout@v2
       with:
           ref: dev
+    - name: Rust version
+      run: rustc -V
+    - name: rustup
+      run: rustup show
+
     - name: Build
       run: cargo build --verbose
 
