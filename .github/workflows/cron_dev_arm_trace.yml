@@ -31,10 +31,10 @@ jobs:
       run: WORKFLOW=1 exec cargo nextest run -F="tokio,trace_log" --hide-progress-bar -j 1 --no-capture
 
     - name: Run tests with --release
-      run: WORKFLOW=1 exec cargo nextest run -F="tokio,trace_log" --hide-progress-bar -j 1 --no-capture -r
+      run: RUSTFLAGS="--cfg tokio_unstable" WORKFLOW=1 exec cargo nextest run -F="tokio,trace_log" --hide-progress-bar -j 1 --no-capture -r
 
     - name: Run tests with --release tokio single-thread
-      run: WORKFLOW=1 SINGLE_THREAD_RUNTIME=1 exec cargo nextest run -F="tokio,trace_log" --hide-progress-bar -j 1 --no-capture -r
+      run: RUSTFLAGS="--cfg tokio_unstable" WORKFLOW=1 SINGLE_THREAD_RUNTIME=1 exec cargo nextest run -F="tokio,trace_log" --hide-progress-bar -j 1 --no-capture -r
 
     - name: Run tests with --release async_std
       run: WORKFLOW=1 SINGLE_THREAD_RUNTIME=1 exec cargo nextest run -F="async_std,trace_log" --hide-progress-bar -j 1 --no-capture -r
