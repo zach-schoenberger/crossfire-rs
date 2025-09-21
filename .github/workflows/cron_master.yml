@@ -25,6 +25,3 @@ jobs:
 
     - name: Run tests with --release
       run: env WORKFLOW=1 make test_release
-
-    - name: Run tests with async_std
-      run: env WORKFLOW=1 make test_async_std

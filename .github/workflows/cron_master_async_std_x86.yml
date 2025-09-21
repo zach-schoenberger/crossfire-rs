@@ -1,0 +1,22 @@
+name: cron-master-async_std-x86
+
+on:
+  schedule: [cron: "0 */5 * * *"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_and_test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Run tests with async_std
+      run: env WORKFLOW=1 make test_async_std
+
+    - name: Run test with async_std release
+      run: env WORKFLOW=1 make test_async_std_release
