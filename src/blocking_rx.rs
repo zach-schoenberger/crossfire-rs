@@ -7,14 +7,14 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-/// Single consumer (receiver) that works in blocking context.
+/// A single consumer (receiver) that works in a blocking context.
 ///
-/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
+/// Additional methods in [ChannelShared] can be accessed through `Deref`.
 ///
-/// **NOTE: Rx is not Clone, nor Sync.**
-/// If you need concurrent access, use [MRx](crate::MRx) instead.
+/// **NOTE**: `Rx` is not `Clone` or `Sync`.
+/// If you need concurrent access, use [MRx] instead.
 ///
-/// Rx has Send marker, can be moved to other thread.
+/// `Rx` has a `Send` marker and can be moved to other threads.
 /// The following code is OK:
 ///
 /// ``` rust
@@ -26,7 +26,7 @@ use std::time::{Duration, Instant};
 /// drop(tx);
 /// ```
 ///
-/// Because Rx does not have Sync marker, using `Arc<Rx>` will lose Send marker.
+/// Because `Rx` does not have a `Sync` marker, using `Arc<Rx>` will lose the `Send` marker.
 ///
 /// For your safety, the following code **should not compile**:
 ///
@@ -166,11 +166,11 @@ impl<T> Rx<T> {
         }
     }
 
-    /// Receive message, will block when channel is empty.
+    /// Receives a message from the channel. This method will block until a message is received or the channel is closed.
     ///
-    /// Returns Ok(T) when successful.
+    /// Returns `Ok(T)` on success.
     ///
-    /// Returns Err([RecvError]) when all Tx dropped.
+    /// Returns Err([RecvError]) if the sender has been dropped.
     #[inline]
     pub fn recv<'a>(&'a self) -> Result<T, RecvError> {
         self._recv_blocking(None).map_err(|err| match err {
@@ -179,13 +179,13 @@ impl<T> Rx<T> {
         })
     }
 
-    /// Try to receive message, non-blocking.
+    /// Attempts to receive a message from the channel without blocking.
     ///
-    /// Returns Ok(T) when successful.
+    /// Returns `Ok(T)` when successful.
     ///
-    /// Returns Err([TryRecvError::Empty]) when channel is empty.
+    /// Returns Err([TryRecvError::Empty]) if the channel is empty.
     ///
-    /// returns Err([TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
+    /// Returns Err([TryRecvError::Disconnected]) if the sender has been dropped and the channel is empty.
     #[inline]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         if self.shared.is_zero() {
@@ -203,17 +203,16 @@ impl<T> Rx<T> {
         }
     }
 
-    /// Waits for a message to be received from the channel, but only for a limited time.
+    /// Receives a message from the channel with a timeout.
     /// Will block when channel is empty.
     ///
-    /// The behavior is atomic, either successfully polls a message,
-    /// or operation cancelled due to timeout.
+    /// The behavior is atomic: the message is either received successfully or the operation is canceled due to a timeout.
     ///
-    /// Returns Ok(T) when successful.
+    /// Returns `Ok(T)` when successful.
     ///
     /// Returns Err([RecvTimeoutError::Timeout]) when a message could not be received because the channel is empty and the operation timed out.
     ///
-    /// returns Err([RecvTimeoutError::Disconnected]) when all Tx dropped and channel is empty.
+    /// Returns Err([RecvTimeoutError::Disconnected]) if the sender has been dropped and the channel is empty.
     #[inline]
     pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
         match Instant::now().checked_add(timeout) {
@@ -226,10 +225,10 @@ impl<T> Rx<T> {
     }
 }
 
-/// Multi-consumer (receiver) that works in blocking context.
+/// A multi-consumer (receiver) that works in a blocking context.
 ///
-/// Inherits [`Rx<T>`] and implements [Clone].
-/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
+/// Inherits from [`Rx<T>`] and implements `Clone`.
+/// Additional methods can be accessed through `Deref<Target=[ChannelShared]>`.
 ///
 /// You can use `into()` to convert it to `Rx<T>`.
 pub struct MRx<T>(pub(crate) Rx<T>);
@@ -267,7 +266,7 @@ impl<T> Clone for MRx<T> {
 impl<T> Deref for MRx<T> {
     type Target = Rx<T>;
 
-    /// inherit all the functions of [Rx]
+    /// Inherits all the functions of [Rx].
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -291,30 +290,30 @@ impl<T> From<MAsyncRx<T>> for MRx<T> {
 pub trait BlockingRxTrait<T: Send + 'static>:
     Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared<T>> + Sized
 {
-    /// Receive message, will block when channel is empty.
+    /// Receives a message from the channel. This method will block until a message is received or the channel is closed.
     ///
-    /// Returns `Ok(T)` when successful.
+    /// Returns `Ok(T)` on success.
     ///
-    /// Returns Err([RecvError]) when all Tx dropped.
+    /// Returns Err([RecvError]) if the sender has been dropped.
     fn recv<'a>(&'a self) -> Result<T, RecvError>;
 
-    /// Try to receive message, non-blocking.
+    /// Attempts to receive a message from the channel without blocking.
     ///
     /// Returns `Ok(T)` when successful.
     ///
-    /// Returns Err([TryRecvError::Empty]) when channel is empty.
+    /// Returns Err([TryRecvError::Empty]) if the channel is empty.
     ///
-    /// Returns Err([TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
+    /// Returns Err([TryRecvError::Disconnected]) if the sender has been dropped and the channel is empty.
     fn try_recv(&self) -> Result<T, TryRecvError>;
 
-    /// Waits for a message to be received from the channel, but only for a limited time.
+    /// Receives a message from the channel with a timeout.
     /// Will block when channel is empty.
     ///
-    /// Returns Ok(T) when successful.
+    /// Returns `Ok(T)` when successful.
     ///
     /// Returns Err([RecvTimeoutError::Timeout]) when a message could not be received because the channel is empty and the operation timed out.
     ///
-    /// returns Err([RecvTimeoutError::Disconnected]) when all Tx dropped and channel is empty.
+    /// Returns Err([RecvTimeoutError::Disconnected]) if the sender has been dropped and the channel is empty.
     fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError>;
 
     /// The number of messages in the channel at the moment

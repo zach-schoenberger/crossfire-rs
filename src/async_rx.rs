@@ -15,20 +15,20 @@ use std::sync::{
 };
 use std::task::{Context, Poll};
 
-/// Single consumer (receiver) that works in async context.
+/// A single consumer (receiver) that works in an async context.
 ///
-/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
+/// Additional methods in [ChannelShared] can be accessed through `Deref`.
 ///
-/// `AsyncRx` can be converted into `Rx` via `From` trait,
-/// that means you can have two types of receivers both within async and
-/// blocking context for the same channel.
+/// `AsyncRx` can be converted into `Rx` via the `From` trait,
+/// which means you can have two types of receivers, both within async and
+/// blocking contexts, for the same channel.
 
 ///
-/// **NOTE: AsyncRx is not Clone, nor Sync.**
-/// If you need concurrent access, use [MAsyncRx](crate::MAsyncRx) instead.
+/// **NOTE**: `AsyncRx` is not `Clone` or `Sync`.
+/// If you need concurrent access, use [MAsyncRx] instead.
 ///
-/// AsyncRx has Send marker, can be moved to other coroutine.
-/// The following code is OK :
+/// `AsyncRx` has a `Send` marker and can be moved to other coroutines.
+/// The following code is OK:
 ///
 /// ``` rust
 /// use crossfire::*;
@@ -41,7 +41,7 @@ use std::task::{Context, Poll};
 /// }
 /// ```
 ///
-/// Because AsyncRx does not have Sync marker, using `Arc<AsyncRx>` will lose Send marker.
+/// Because `AsyncRx` does not have a `Sync` marker, using `Arc<AsyncRx>` will lose the `Send` marker.
 ///
 /// For your safety, the following code **should not compile**:
 ///
@@ -110,32 +110,31 @@ impl<T> AsyncRx<T> {
         }
     }
 
-    /// Receive message, will await when channel is empty.
+    /// Receives a message from the channel. This method will await until a message is received or the channel is closed.
     ///
-    /// This function is cancellation-safe, it's ok to use with `timeout` and `select!` macro.
-    /// That means when [RecvFuture] is dropped, there won't be message received from channel.
+    /// This function is cancellation-safe, so it's safe to use with `timeout()` and the `select!` macro.
+    /// When a [RecvFuture] is dropped, no message will be received from the channel.
     ///
-    /// For timeout scenario, there's an alternative [AsyncRx::recv_timeout()].
+    /// For timeout scenarios, there's an alternative: [AsyncRx::recv_timeout()].
     ///
-    /// Returns `Ok(T)` when successful.
+    /// Returns `Ok(T)` on success.
     ///
-    /// returns Err([RecvError]) when all Tx dropped.
+    /// Returns Err([RecvError]) if the sender has been dropped.
     #[inline(always)]
     pub fn recv<'a>(&'a self) -> RecvFuture<'a, T> {
         return RecvFuture { rx: self, waker: None };
     }
 
-    /// Waits for a message to be received from the channel, but only for a limited time.
+    /// Receives a message from the channel with a timeout.
     /// Will await when channel is empty.
     ///
-    /// The behavior is atomic, either successfully polls a message,
-    /// or operation cancelled due to timeout.
+    /// The behavior is atomic: the message is either received successfully or the operation is canceled due to a timeout.
     ///
-    /// Returns Ok(T) when successful.
+    /// Returns `Ok(T)` when successful.
     ///
     /// Returns Err([RecvTimeoutError::Timeout]) when a message could not be received because the channel is empty and the operation timed out.
     ///
-    /// returns Err([RecvTimeoutError::Disconnected]) when all Tx dropped and channel is empty.
+    /// Returns Err([RecvTimeoutError::Disconnected]) if the sender has been dropped and the channel is empty.
     #[cfg(any(feature = "tokio", feature = "async_std"))]
     #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     #[inline]
@@ -153,13 +152,13 @@ impl<T> AsyncRx<T> {
         return RecvTimeoutFuture { rx: self, waker: None, sleep };
     }
 
-    /// Try to receive message, non-blocking.
+    /// Attempts to receive a message from the channel without blocking.
     ///
     /// Returns `Ok(T)` on successful.
     ///
-    /// Returns Err([TryRecvError::Empty]) when channel is empty.
+    /// Returns Err([TryRecvError::Empty]) if the channel is empty.
     ///
-    /// Returns Err([TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
+    /// Returns Err([TryRecvError::Disconnected]) if the sender has been dropped and the channel is empty.
     #[inline(always)]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         if let Some(item) = self.shared.try_recv() {
@@ -461,16 +460,16 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
     }
 }
 
-/// Multi-consumer (receiver) that works in async context.
+/// A multi-consumer (receiver) that works in an async context.
 ///
-/// Inherits [`AsyncRx<T>`] and implements [Clone].
-/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
+/// Inherits from [`AsyncRx<T>`] and implements `Clone`.
+/// Additional methods in [ChannelShared] can be accessed through `Deref`.
 ///
 /// You can use `into()` to convert it to `AsyncRx<T>`.
 ///
-/// `MAsyncRx` can be converted into `MRx` via `From` trait,
-/// that means you can have two types of receivers both within async and
-/// blocking context for the same channel.
+/// `MAsyncRx` can be converted into `MRx` via the `From` trait,
+/// which means you can have two types of receivers, both within async and
+/// blocking contexts, for the same channel.
 
 pub struct MAsyncRx<T>(pub(crate) AsyncRx<T>);
 

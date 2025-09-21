@@ -8,7 +8,7 @@ use std::task::*;
 
 /// Constructed by [AsyncRx::into_stream()](crate::AsyncRx::into_stream())
 ///
-/// Implemented futures::stream::Stream;
+/// Implements `futures::stream::Stream`.
 pub struct AsyncStream<T> {
     rx: AsyncRx<T>,
     waker: Option<RecvWaker>,
@@ -36,30 +36,30 @@ where
         Self { rx, waker: None, ended: false }
     }
 
-    /// poll_item() will try to receive message.
-    /// On channel empty, will register notification for the next poll.
+    /// `poll_item()` will try to receive a message.
+    /// If the channel is empty, it will register a notification for the next poll.
     ///
     /// # Behavior
     ///
-    /// The polling behavior is different from [ReceiveFuture](crate::ReceiveFuture).
-    /// Because waker is not exposed to user, you cannot to delicate operation to
-    /// the waker (compared to the `Drop` handler in `ReceiveFuture`).
-    /// To make sure no deadlock happen on cancellation,
-    /// WakerState will be `INIT` after registered (and will not convert to `WAITING`).
-    /// The senders will wake up all `INIT` state wakers,
-    /// until it find a normal pending receiver in `WAITING` state.
+    /// The polling behavior is different from [RecvFuture](crate::RecvFuture).
+    /// Because the waker is not exposed to the user, you cannot perform delicate operations on
+    /// the waker (compared to the `Drop` handler in `RecvFuture`).
+    /// To make sure no deadlock happens on cancellation, the `WakerState` will be `Init`
+    /// after being registered (and will not be converted to `Waiting`).
+    /// The senders will wake up all `Init` state wakers until they find a normal
+    /// pending receiver in the `Waiting` state.
     ///
     /// # Return Value:
     ///
-    /// Returns `Ok(T)` on successful.
+    /// Returns `Ok(T)` on success.
     ///
-    /// Return Err([crate::TryRecvError::Empty]) for Poll::Pending case.
-    /// The next time channel is not empty, your future will be waked again,
-    /// should continue calling poll_item() to receive message.
-    /// If you want to cancel, just don't call poll_item(), others always have chances
+    /// Returns Err([TryRecvError::Empty]) for a `Poll::Pending` case.
+    /// The next time the channel is not empty, your future will be woken again.
+    /// You should then continue calling `poll_item()` to receive the message.
+    /// If you want to cancel, just don't call `poll_item()` again. Others will still have a chance
     /// to receive messages.
     ///
-    /// Return Err([crate::TryRecvError::Disconnected]) when all Tx dropped and channel is empty.
+    /// Returns Err([TryRecvError::Disconnected]) if all `Tx` have been dropped and the channel is empty.
     #[inline]
     pub fn poll_item(&mut self, ctx: &mut Context) -> Poll<Option<T>> {
         match self.rx.poll_item(ctx, &mut self.waker, true) {

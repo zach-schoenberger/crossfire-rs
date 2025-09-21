@@ -117,42 +117,42 @@ impl<T> ChannelShared<T> {
         self.bound_size == Some(0)
     }
 
-    /// The number of messages in the channel at the moment.
+    /// The number of messages in the channel.
     #[inline(always)]
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
-    /// The capacity of the channel, return None for unbounded channel.
+    /// The capacity of the channel. Returns `None` for unbounded channels.
     #[inline(always)]
     pub fn capacity(&self) -> Option<usize> {
         self.inner.capacity()
     }
 
-    /// Whether channel is empty at the moment
+    /// Returns `true` if the channel is empty.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
-    /// Whether the channel is full at the moment
+    /// Returns `true` if the channel is full.
     pub fn is_full(&self) -> bool {
         self.inner.is_full()
     }
 
-    /// Return true if all the senders or receivers are dropped
+    /// Returns `true` if all senders or receivers have been dropped.
     #[inline(always)]
     pub fn is_disconnected(&self) -> bool {
         self.closed.load(Ordering::SeqCst)
     }
 
-    /// Get the count of alive senders
+    /// Returns the number of senders for the channel.
     #[inline(always)]
     pub fn get_tx_count(&self) -> usize {
         self.tx_count.load(Ordering::Acquire) as usize
     }
 
-    /// Get the count of alive receivers
+    /// Returns the number of receivers for the channel.
     #[inline(always)]
     pub fn get_rx_count(&self) -> usize {
         self.rx_count.load(Ordering::Acquire) as usize
@@ -163,7 +163,7 @@ impl<T> ChannelShared<T> {
         self.senders.use_direct_copy(self)
     }
 
-    /// Just for debugging purpose, to monitor queue size
+    /// Returns the number of wakers for senders and receivers. For debugging purposes.
     pub fn get_wakers_count(&self) -> (usize, usize) {
         (self.senders.len(), self.recvs.len())
     }
@@ -180,7 +180,7 @@ impl<T> ChannelShared<T> {
         let _ = self.congest.fetch_sub(1, Ordering::Acquire);
     }
 
-    /// Call when tx drop
+    /// This method is called when a sender is dropped.
     #[inline(always)]
     pub(crate) fn close_tx(&self) {
         let _ = self.congest.fetch_sub(1, Ordering::Relaxed);
@@ -194,7 +194,7 @@ impl<T> ChannelShared<T> {
         }
     }
 
-    /// Call when rx drop
+    /// This method is called when a receiver is dropped.
     #[inline(always)]
     pub(crate) fn close_rx(&self) {
         let _ = self.congest.fetch_add(1, Ordering::Relaxed);

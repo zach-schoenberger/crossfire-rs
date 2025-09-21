@@ -8,14 +8,14 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-/// Single producer (sender) that works in blocking context.
+/// A single producer (sender) that works in a blocking context.
 ///
-/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
+/// Additional methods in [ChannelShared] can be accessed through `Deref`.
 ///
-/// **NOTE: Tx is not Clone, nor Sync.**
-/// If you need concurrent access, use [MTx](crate::MTx) instead.
+/// **NOTE**: `Tx` is not `Clone` or `Sync`.
+/// If you need concurrent access, use [MTx] instead.
 ///
-/// Tx has Send marker, can be moved to other thread.
+/// `Tx` has a `Send` marker and can be moved to other threads.
 /// The following code is OK:
 ///
 /// ``` rust
@@ -27,7 +27,7 @@ use std::time::{Duration, Instant};
 /// drop(rx);
 /// ```
 ///
-/// Because Tx does not have Sync marker, using `Arc<Tx>` will lose Send marker.
+/// Because `Tx` does not have a `Sync` marker, using `Arc<Tx>` will lose the `Send` marker.
 ///
 /// For your safety, the following code **should not compile**:
 ///
@@ -194,11 +194,11 @@ impl<T: Send + 'static> Tx<T> {
         }
     }
 
-    /// Send message. Will block when channel is full.
+    /// Sends a message. This method will block until the message is sent or the channel is closed.
     ///
-    /// Returns `Ok(())` on successful.
+    /// Returns `Ok(())` on success.
     ///
-    /// Returns Err([SendError]) when all Rx is dropped.
+    /// Returns `Err(SendError)` if the receiver has been dropped.
     ///
     #[inline]
     pub fn send(&self, item: T) -> Result<(), SendError<T>> {
@@ -227,13 +227,13 @@ impl<T: Send + 'static> Tx<T> {
         }
     }
 
-    /// Try to send message, non-blocking
+    /// Attempts to send a message without blocking.
     ///
     /// Returns `Ok(())` when successful.
     ///
-    /// Returns Err([TrySendError::Full]) on channel full for bounded channel.
+    /// Returns Err([TrySendError::Full]) if the channel is full.
     ///
-    /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
+    /// Returns Err([TrySendError::Disconnected]) if the receiver has been dropped.
     #[inline]
     pub fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
         let shared = &self.shared;
@@ -249,16 +249,16 @@ impl<T: Send + 'static> Tx<T> {
         }
     }
 
-    /// Waits for a message to be sent into the channel, but only for a limited time.
+    /// Sends a message with a timeout.
     /// Will block when channel is full.
     ///
-    /// The behavior is atomic, either message sent successfully or returned on error.
+    /// The behavior is atomic: the message is either sent successfully or returned on error.
     ///
     /// Returns `Ok(())` when successful.
     ///
-    /// Returns Err([SendTimeoutError::Timeout]) when the the operation timed out.
+    /// Returns Err([SendTimeoutError::Timeout]) if the operation timed out.
     ///
-    /// Returns Err([SendTimeoutError::Disconnected]) when all Rx dropped.
+    /// Returns Err([SendTimeoutError::Disconnected]) if the receiver has been dropped.
     #[inline]
     pub fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>> {
         let shared = &self.shared;
@@ -299,10 +299,10 @@ impl<T> Tx<T> {
     }
 }
 
-/// Multi-producer (sender) that works in blocking context.
+/// A multi-producer (sender) that works in a blocking context.
 ///
-/// Inherits [`Tx<T>`] and implements [Clone].
-/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
+/// Inherits from [`Tx<T>`] and implements `Clone`.
+/// Additional methods can be accessed through `Deref<Target=[ChannelShared]>`.
 ///
 /// You can use `into()` to convert it to `Tx<T>`.
 pub struct MTx<T>(pub(crate) Tx<T>);
@@ -353,7 +353,7 @@ impl<T> Clone for MTx<T> {
 impl<T> Deref for MTx<T> {
     type Target = Tx<T>;
 
-    /// inherit all the functions of [Tx]
+    /// Inherits all the functions of [Tx].
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -364,30 +364,30 @@ impl<T> Deref for MTx<T> {
 pub trait BlockingTxTrait<T: Send + 'static>:
     Send + 'static + fmt::Debug + fmt::Display + AsRef<ChannelShared<T>> + Sized
 {
-    /// Send message. Will block when channel is full.
+    /// Sends a message. This method will block until the message is sent or the channel is closed.
     ///
-    /// Returns `Ok(())` on successful.
+    /// Returns `Ok(())` on success.
     ///
-    /// Returns Err([SendError]) when all Rx is dropped.
+    /// Returns Err([SendError]) if the receiver has been dropped.
     fn send(&self, _item: T) -> Result<(), SendError<T>>;
 
-    /// Try to send message, non-blocking
+    /// Attempts to send a message without blocking.
     ///
     /// Returns `Ok(())` when successful.
     ///
-    /// Returns Err([TrySendError::Full]) on channel full for bounded channel.
+    /// Returns `Err([TrySendError::Full])` if the channel is full.
     ///
-    /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
+    /// Returns Err([TrySendError::Disconnected]) if the receiver has been dropped.
     fn try_send(&self, _item: T) -> Result<(), TrySendError<T>>;
 
-    /// Waits for a message to be sent into the channel, but only for a limited time.
+    /// Sends a message with a timeout.
     /// Will block when channel is empty.
     ///
     /// Returns `Ok(())` when successful.
     ///
-    /// Returns Err([SendTimeoutError::Timeout]) when the message could not be sent because the channel is full and the operation timed out.
+    /// Returns Err([SendTimeoutError::Timeout]) if the message could not be sent because the channel is full and the operation timed out.
     ///
-    /// Returns Err([SendTimeoutError::Disconnected]) when all Rx dropped.
+    /// Returns Err([SendTimeoutError::Disconnected]) if the receiver has been dropped.
     fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>>;
 
     /// The number of messages in the channel at the moment

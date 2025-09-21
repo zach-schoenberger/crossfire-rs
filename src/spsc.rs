@@ -1,12 +1,11 @@
 //! Single producer, single consumer.
 //!
-//! The optimization assumes single producer and consumer condition, waker
-//! registration is completely lockless.
+//! The optimization assumes a single producer and consumer, so waker registration is completely lockless.
 //!
-//! **NOTE**: For SP / SC version [AsyncTx], [AsyncRx], [Tx], [Rx], is not `Clone`, and without `Sync`,
-//! Although can be moved to other thread, but not allowed to use send/recv while in Arc.
+//! **NOTE**: For the SP/SC version, [AsyncTx], [AsyncRx], [Tx], and [Rx] are not `Clone` and do not implement `Sync`.
+//! Although they can be moved to other threads, they are not allowed to be used with `send`/`recv` while in an `Arc`.
 //!
-//! The following code is OK :
+//! The following code is OK:
 //!
 //! ``` rust
 //! use crossfire::*;
@@ -19,7 +18,7 @@
 //! }
 //! ```
 //!
-//! Because AsyncTx does not have Sync marker, using `Arc<AsyncTx>` will lose Send marker.
+//! Because the `AsyncTx` does not have the `Sync` marker, using `Arc<AsyncTx>` will lose the `Send` marker.
 //!
 //! For your safety, the following code **should not compile**:
 //!
@@ -42,9 +41,9 @@ use crate::blocking_rx::*;
 use crate::blocking_tx::*;
 use crate::channel::*;
 
-/// Initiate an unbounded channel for blocking context.
+/// Creates an unbounded channel for use in a blocking context.
 ///
-/// Sender will never block, so we use the same TxBlocking for threads
+/// The sender will never block, so we use the same `Tx` for all threads.
 pub fn unbounded_blocking<T: Unpin>() -> (Tx<T>, Rx<T>) {
     let send_wakers = RegistrySender::Dummy;
     let recv_wakers = RegistryRecv::new_single();
@@ -54,9 +53,9 @@ pub fn unbounded_blocking<T: Unpin>() -> (Tx<T>, Rx<T>) {
     (tx, rx)
 }
 
-/// Initiate an unbounded channel for async context.
+/// Creates an unbounded channel for use in an async context.
 ///
-/// Sender will never block, so we use the same TxBlocking for threads
+/// The sender will never block, so we use the same `Tx` for all threads.
 pub fn unbounded_async<T: Unpin>() -> (Tx<T>, AsyncRx<T>) {
     let send_wakers = RegistrySender::Dummy;
     let recv_wakers = RegistryRecv::new_single();
@@ -66,9 +65,9 @@ pub fn unbounded_async<T: Unpin>() -> (Tx<T>, AsyncRx<T>) {
     (tx, rx)
 }
 
-/// Initiate a bounded channel for blocking context
+/// Creates a bounded channel for use in a blocking context.
 ///
-/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+/// As a special case, a channel size of 0 is not supported and will be treated as a channel of size 1.
 pub fn bounded_blocking<T: Unpin>(mut size: usize) -> (Tx<T>, Rx<T>) {
     if size == 0 {
         size = 1;
@@ -81,9 +80,9 @@ pub fn bounded_blocking<T: Unpin>(mut size: usize) -> (Tx<T>, Rx<T>) {
     (tx, rx)
 }
 
-/// Initiate a bounded channel that sender and receiver are async
+/// Creates a bounded channel where both the sender and receiver are async.
 ///
-/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+/// As a special case, a channel size of 0 is not supported and will be treated as a channel of size 1.
 pub fn bounded_async<T: Unpin>(mut size: usize) -> (AsyncTx<T>, AsyncRx<T>) {
     if size == 0 {
         size = 1;
@@ -96,9 +95,9 @@ pub fn bounded_async<T: Unpin>(mut size: usize) -> (AsyncTx<T>, AsyncRx<T>) {
     (tx, rx)
 }
 
-/// Initiate a bounded channel that sender is async, receiver is blocking
+/// Creates a bounded channel where the sender is async and the receiver is blocking.
 ///
-/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+/// As a special case, a channel size of 0 is not supported and will be treated as a channel of size 1.
 pub fn bounded_tx_async_rx_blocking<T: Unpin>(mut size: usize) -> (AsyncTx<T>, Rx<T>) {
     if size == 0 {
         size = 1;
@@ -111,9 +110,9 @@ pub fn bounded_tx_async_rx_blocking<T: Unpin>(mut size: usize) -> (AsyncTx<T>, R
     (tx, rx)
 }
 
-/// Initiate a bounded channel that sender is blocking, receiver is sync
+/// Creates a bounded channel where the sender is blocking and the receiver is async.
 ///
-/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+/// As a special case, a channel size of 0 is not supported and will be treated as a channel of size 1.
 pub fn bounded_tx_blocking_rx_async<T>(mut size: usize) -> (Tx<T>, AsyncRx<T>) {
     if size == 0 {
         size = 1;

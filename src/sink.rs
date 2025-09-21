@@ -6,7 +6,7 @@ use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::task::*;
 
-/// This is for you to write custom future with poll_send(ctx)
+/// An async sink that allows you to write custom futures with `poll_send(ctx)`.
 pub struct AsyncSink<T> {
     tx: AsyncTx<T>,
     waker: Option<SendWaker<T>>,
@@ -55,30 +55,30 @@ impl<T: Unpin + Send + 'static> From<MAsyncTx<T>> for AsyncSink<T> {
 }
 
 impl<T: Send + Unpin + 'static> AsyncSink<T> {
-    /// poll_send() will try to send message.
-    /// On channel full, will register notification for the next poll.
+    /// `poll_send()` will try to send a message.
+    /// If the channel is full, it will register a notification for the next poll.
     ///
     /// # Behavior
     ///
     /// The polling behavior is different from [SendFuture](crate::SendFuture).
-    /// Because waker is not exposed to user, you cannot to delicate operation to
+    /// Because the waker is not exposed to the user, you cannot perform delicate operations on
     /// the waker (compared to the `Drop` handler in `SendFuture`).
-    /// To make sure no deadlock happen on cancellation,
-    /// WakerState will be `INIT` after registered (and will not convert to `WAITING`).
-    /// The receivers will wake up all `INIT` state wakers,
-    /// until it find a normal pending sender in `WAITING` state.
+    /// To make sure no deadlock happens on cancellation, the `WakerState` will be `Init`
+    /// after being registered (and will not be converted to `Waiting`).
+    /// The receivers will wake up all `Init` state wakers until they find a normal
+    /// pending sender in the `Waiting` state.
     ///
     /// # Return value:
     ///
     /// Returns `Ok(())` on message sent.
     ///
-    /// Returns Err([crate::TrySendError::Full]) for Poll::Pending case.
-    /// The next time channel is not full, your future will be waked again,
-    /// should continue calling poll_send() to send message.
-    /// If you want to cancel, just don't call poll_send() again and there's no side-effect,
-    /// others always have chances to send message.
+    /// Returns `Err([crate::TrySendError::Full])` for a `Poll::Pending` case.
+    /// The next time the channel is not full, your future will be woken again.
+    /// You should then continue calling `poll_send()` to send the message.
+    /// If you want to cancel, just don't call `poll_send()` again. There are no side effects,
+    /// and other senders will have a chance to send their messages.
     ///
-    /// Returns Err([crate::TrySendError::Disconnected]) when all Rx dropped.
+    /// Returns `Err([crate::TrySendError::Disconnected])` when all `Rx` are dropped.
     #[inline]
     pub fn poll_send(&mut self, ctx: &mut Context, item: T) -> Result<(), TrySendError<T>> {
         let _item = MaybeUninit::new(item);

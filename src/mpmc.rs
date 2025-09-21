@@ -6,9 +6,9 @@ use crate::blocking_rx::*;
 use crate::blocking_tx::*;
 use crate::channel::*;
 
-/// Initiate an unbounded channel for blocking context.
+/// Creates an unbounded channel for use in a blocking context.
 ///
-/// Sender will never block, so we use the same TxBlocking for threads
+/// The sender will never block, so we use the same `Tx` for all threads.
 pub fn unbounded_blocking<T: Unpin>() -> (MTx<T>, MRx<T>) {
     let send_wakers = RegistrySender::Dummy;
     let recv_wakers = RegistryRecv::new_multi();
@@ -18,9 +18,9 @@ pub fn unbounded_blocking<T: Unpin>() -> (MTx<T>, MRx<T>) {
     (tx, rx)
 }
 
-/// Initiate an unbounded channel for async context.
+/// Creates an unbounded channel for use in an async context.
 ///
-/// Although sender type is MTx, will never block.
+/// Although the sender type is `MTx`, it will never block.
 pub fn unbounded_async<T: Unpin>() -> (MTx<T>, MAsyncRx<T>) {
     let send_wakers = RegistrySender::Dummy;
     let recv_wakers = RegistryRecv::new_multi();
@@ -30,9 +30,9 @@ pub fn unbounded_async<T: Unpin>() -> (MTx<T>, MAsyncRx<T>) {
     (tx, rx)
 }
 
-/// Initiate a bounded channel for blocking context
+/// Creates a bounded channel for use in a blocking context.
 ///
-/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+/// As a special case, a channel size of 0 is not supported and will be treated as a channel of size 1.
 pub fn bounded_blocking<T: Unpin>(mut size: usize) -> (MTx<T>, MRx<T>) {
     if size == 0 {
         size = 1;
@@ -45,9 +45,9 @@ pub fn bounded_blocking<T: Unpin>(mut size: usize) -> (MTx<T>, MRx<T>) {
     (tx, rx)
 }
 
-/// Initiate a bounded channel for async context.
+/// Creates a bounded channel for use in an async context.
 ///
-/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+/// As a special case, a channel size of 0 is not supported and will be treated as a channel of size 1.
 pub fn bounded_async<T: Unpin>(mut size: usize) -> (MAsyncTx<T>, MAsyncRx<T>) {
     if size == 0 {
         size = 1;
@@ -60,9 +60,9 @@ pub fn bounded_async<T: Unpin>(mut size: usize) -> (MAsyncTx<T>, MAsyncRx<T>) {
     (tx, rx)
 }
 
-/// Initiate a bounded channel that sender is async, receiver is blocking.
+/// Creates a bounded channel where the sender is async and the receiver is blocking.
 ///
-/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+/// As a special case, a channel size of 0 is not supported and will be treated as a channel of size 1.
 pub fn bounded_tx_async_rx_blocking<T: Unpin>(mut size: usize) -> (MAsyncTx<T>, MRx<T>) {
     if size == 0 {
         size = 1;
@@ -76,9 +76,9 @@ pub fn bounded_tx_async_rx_blocking<T: Unpin>(mut size: usize) -> (MAsyncTx<T>, 
     (tx, rx)
 }
 
-/// Initiate a bounded channel that sender is blocking, receiver is async
+/// Creates a bounded channel where the sender is blocking and the receiver is async.
 ///
-/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+/// As a special case, a channel size of 0 is not supported and will be treated as a channel of size 1.
 pub fn bounded_tx_blocking_rx_async<T: Unpin>(mut size: usize) -> (MTx<T>, MAsyncRx<T>) {
     if size == 0 {
         size = 1;

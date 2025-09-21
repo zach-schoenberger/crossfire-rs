@@ -16,19 +16,18 @@ use std::sync::{
 };
 use std::task::{Context, Poll};
 
-/// Single producer (sender) that works in async context.
+/// A single producer (sender) that works in an async context.
 ///
-/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
+/// Additional methods in [ChannelShared] can be accessed through `Deref`.
 ///
-/// `AsyncTx` can be converted into `Tx` via `From` trait,
-/// that means you can have two types of senders both within async context and
-/// blocking context to the same channel.
+/// `AsyncTx` can be converted into `Tx` via the `From` trait.
+/// This means you can have two types of senders, both within async and blocking contexts, for the same channel.
 ///
-/// **NOTE: AsyncTx is not Clone, nor Sync.**
-/// If you need concurrent access, use [MAsyncTx](crate::MAsyncTx) instead.
+/// **NOTE**: `AsyncTx` is not `Clone` or `Sync`.
+/// If you need concurrent access, use [MAsyncTx] instead.
 ///
-/// AsyncTx has Send marker, can be moved to other coroutine.
-/// The following code is OK :
+/// `AsyncTx` has a `Send` marker and can be moved to other coroutines.
+/// The following code is OK:
 ///
 /// ``` rust
 /// use crossfire::*;
@@ -41,7 +40,7 @@ use std::task::{Context, Poll};
 /// }
 /// ```
 ///
-/// Because AsyncTx does not have Sync marker, using `Arc<AsyncTx>` will lose Send marker.
+/// Because `AsyncTx` does not have a `Sync` marker, using `Arc<AsyncTx>` will lose the `Send` marker.
 ///
 /// For your safety, the following code **should not compile**:
 ///
@@ -122,29 +121,28 @@ impl<T> AsyncTx<T> {
 }
 
 impl<T: Unpin + Send + 'static> AsyncTx<T> {
-    /// Send message. Will await when channel is full.
+    /// Sends a message. This method will await until the message is sent or the channel is closed.
     ///
-    /// This function is cancellation-safe, it's ok to use with `timeout` and `select!` macro.
-    /// That means when [SendFuture] is dropped, there won't be message sent,
-    /// But the original message can not be returned due to the limitation of future API.
-    /// For timeout scenario, recommend using [AsyncTx::send_timeout()] instead,
-    /// which will return the message in [SendTimeoutError].
+    /// This function is cancellation-safe, so it's safe to use with `timeout()` and the `select!` macro.
+    /// When a [SendFuture] is dropped, no message will be sent. However, the original message
+    /// cannot be returned due to API limitations. For timeout scenarios, we recommend using
+    /// [AsyncTx::send_timeout()], which returns the message in a [SendTimeoutError].
     ///
-    /// Returns `Ok(())` on successful.
+    /// Returns `Ok(())` on success.
     ///
-    /// Returns Err([SendError]) when all Rx is dropped.
+    /// Returns Err([SendError]) if the receiver has been dropped.
     #[inline(always)]
     pub fn send<'a>(&'a self, item: T) -> SendFuture<'a, T> {
         return SendFuture { tx: &self, item: MaybeUninit::new(item), waker: None };
     }
 
-    /// Try to send message, non-blocking
+    /// Attempts to send a message without blocking.
     ///
     /// Returns `Ok(())` when successful.
     ///
-    /// Returns Err([TrySendError::Full]) on channel full for bounded channel.
+    /// Returns Err([TrySendError::Full]) if the channel is full.
     ///
-    /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
+    /// Returns Err([TrySendError::Disconnected]) if the receiver has been dropped.
     #[inline]
     pub fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
         if self.shared.is_disconnected() {
@@ -159,17 +157,16 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
         }
     }
 
-    /// Waits for a message to be sent into the channel, but only for a limited time.
+    /// Sends a message with a timeout.
     /// Will await when channel is full.
     ///
-    /// The behavior is atomic, either message sent successfully or returned on error.
+    /// The behavior is atomic: the message is either sent successfully or returned on error.
     ///
     /// Returns `Ok(())` when successful.
     ///
-    /// Returns Err([SendTimeoutError::Timeout]) when the operation timed out, which contains the message
-    /// failed to send.
+    /// Returns Err([SendTimeoutError::Timeout]) if the operation timed out. The error contains the message that failed to be sent.
     ///
-    /// Returns Err([SendTimeoutError::Disconnected]) when all Rx dropped, which contains the message failed to send.
+    /// Returns Err([SendTimeoutError::Disconnected]) if the receiver has been dropped. The error contains the message that failed to be sent.
     #[cfg(any(feature = "tokio", feature = "async_std"))]
     #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     #[inline]
@@ -478,16 +475,16 @@ impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for AsyncTx<T> {
     }
 }
 
-/// Multi-producer (sender) that works in async context.
+/// A multi-producer (sender) that works in an async context.
 ///
-/// Inherits [`AsyncTx<T>`] and implements [Clone].
-/// Additional methods can be accessed through Deref<Target=[ChannelShared]>.
+/// Inherits from [`AsyncTx<T>`] and implements `Clone`.
+/// Additional methods in [ChannelShared] can be accessed through `Deref`.
 ///
 /// You can use `into()` to convert it to `AsyncTx<T>`.
 ///
-/// `MAsyncTx` can be converted into `MTx` via `From` trait,
-/// that means you can have two types of senders both within async and
-/// blocking context to the same channel.
+/// `MAsyncTx` can be converted into `MTx` via the `From` trait,
+/// which means you can have two types of senders, both within async and
+/// blocking contexts, for the same channel.
 
 pub struct MAsyncTx<T>(pub(crate) AsyncTx<T>);
 
