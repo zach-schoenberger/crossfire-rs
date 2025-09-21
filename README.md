@@ -165,7 +165,7 @@ if poll() returns pending.
 Cargo.toml:
 ```toml
 [dependencies]
-crossfire = "2.0"
+crossfire = "2.1"
 ```
 
 # Example with tokio::select!
