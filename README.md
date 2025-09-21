@@ -36,6 +36,16 @@ Being a lockless channel, crossfire outperforms other async-capable channels.
 And thanks to a lighter notification mechanism, in a blocking context, some cases are even
 better than the original crossbeam-channel,
 
+<img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2.1.0-2025-09-21/mpsc_size_100_sync.png" alt="mpsc bounded size 100 blocking context">
+
+<img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2.1.0-2025-09-21/mpmc_size_100_sync.png" alt="mpmc bounded size 100 blocking context">
+
+<img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2.1.0-2025-09-21/mpsc_size_100_tokio.png" alt="mpsc bounded size 100 async context">
+
+<img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2.1.0-2025-09-21/mpmc_size_100_tokio.png" alt="mpmc bounded size 100 async context">
+
+More benchmark data is posted on [wiki](https://github.com/frostyplanet/crossfire-rs/wiki/benchmark-v2.1.0-vs-v2.0.26-2025%E2%80%9009%E2%80%9021).
+
 Also, being a lockless channel, the algorithm relies on spinning and yielding. Spinning is good on
 multi-core systems, but not friendly to single-core systems (like virtual machines).
 So we provide a function `detect_backoff_cfg()` to detect the running platform.
@@ -46,14 +56,6 @@ The benchmark is written in the criterion framework. You can run the benchmark b
 ```
 cargo bench --bench crossfire
 ```
-
-More benchmark data is on the [wiki](https://github.com/frostyplanet/crossfire-rs/wiki/benchmark-v2.0.14-2025%E2%80%9008%E2%80%9003). Here are some of the results:
-
-<img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2.0.14-2025-08-03/mpsc_size_100_async.png" alt="mpsc bounded size 100 async context">
-
-<img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2.0.14-2025-08-03/mpmc_size_100_async.png" alt="mpmc bounded size 100 async context">
-
-<img src="https://github.com/frostyplanet/crossfire-rs/wiki/images/benchmark-2.0.14-2025-08-03/mpmc_unbounded_async.png" alt="mpmc unbounded async context">
 
 
 ## APIs
