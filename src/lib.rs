@@ -21,6 +21,13 @@
 //! and implemented with a modified version of crossbeam-queue,
 //! which brings performance improvements for both async and blocking contexts.
 //!
+//! ## Test status
+//!
+//! **WARNING**: Because v2.1 has push the speed to a level no one has gone before, it can put a pure pressure to the async runtime.
+//! Some hidden bug (especially atomic ops on weaker ordering platform) might occur.
+//!
+//! Refer to the [README](https://github.com/frostyplanet/crossfire-rs?tab=readme-ov-file#test-status) page for known issue on specified platform and runtime.
+//!
 //! ## Performance
 //!
 //! Being a lockless channel, crossfire outperforms other async-capable channels.

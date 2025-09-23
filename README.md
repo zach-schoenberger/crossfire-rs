@@ -60,7 +60,9 @@ cargo bench --bench crossfire
 
 ## Test status
 
-**NOTE**: Because v2.1 has push the speed to a level no one has gone before, it can put a pure pressure to the async runtime. some hidden bug (especially atomic ops on weaker ordering platform) might occur:
+**NOTE**: Because v2.1 has push the speed to a level no one has gone before,
+it can put a pure pressure to the async runtime.
+Some hidden bug (especially atomic ops on weaker ordering platform) might occur:
 
 <table cellpadding="30">
 <tr><th>arch</th><th>runtime</th><th>workflow</th><th>status</th></tr>
