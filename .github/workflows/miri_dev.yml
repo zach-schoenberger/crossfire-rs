@@ -8,7 +8,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test_tokio_mutlti_thread:
+  test_tokio:
 
     runs-on: ubuntu-latest
 
@@ -20,7 +20,7 @@ jobs:
     - name: install miri
       run:  rustup component add --toolchain nightly-x86_64-unknown-linux-gnu miri
 
-    - name: Run miri tests with log (tokio multithread)
+    - name: Run miri tests with log (tokio multi thread)
       run: scripts/miri.sh --features trace_log,tokio
 
     - name: collect log
@@ -30,22 +30,10 @@ jobs:
           name: crossfire_miri_tokio_multithread
           path: /tmp/crossfire_miri.log
 
-    - name: Run miri tests without log
+    - name: Run miri tests without log (tokio multi thread)
       run: scripts/miri.sh
 
-  test_tokio_current_thread:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v2
-      with:
-          ref: dev
-
-    - name: install miri
-      run:  rustup component add --toolchain nightly-x86_64-unknown-linux-gnu miri
-
-    - name: Run miri tests with log (tokio multithread)
+    - name: Run miri tests with log (tokio current thread)
       run: SINGLE_THREAD_RUNTIME=1 scripts/miri.sh --features trace_log,tokio
 
     - name: collect log
@@ -55,5 +43,5 @@ jobs:
           name: crossfire_miri
           path: /tmp/crossfire_miri.log
 
-    - name: Run miri tests without log
+    - name: Run miri tests without log (tokio current thread)
       run: SINGLE_THREAD_RUNTIME=1 scripts/miri.sh
