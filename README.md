@@ -30,6 +30,7 @@ by removing generic types from the ChannelShared type, which made it easier to c
 implemented a modified version of crossbeam-queue, which brings performance
 improvements for both async and blocking contexts.
 
+
 ## Performance
 
 Being a lockless channel, crossfire outperforms other async-capable channels.
@@ -57,6 +58,84 @@ The benchmark is written in the criterion framework. You can run the benchmark b
 cargo bench --bench crossfire
 ```
 
+## Test status
+
+**NOTE**: Because v2.1 has push the speed to a level no one has gone before, it can put a pure pressure to the async runtime. some hidden bug (especially atomic ops on weaker ordering platform) might occur:
+
+<table cellpadding="30">
+<tr><th>arch</th><th>runtime</th><th>workflow</th><th>status</th></tr>
+<tr>
+<td align="center" rowspan="3">x86_64</td>
+<td>threaded</td>
+<td rowspan="2"><a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master.yml">cron_master</a> </td>
+<td>PASSED</td>
+</tr>
+<tr><td>tokio 1.47.1</td>
+<td>PASSED</td>
+</tr>
+<tr><td>async-std</td>
+<td><a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master_async_std_x86.yml">cron_master_async_std_x86</a></td>
+<td>PASSED</td>
+</tr>
+<tr><td align="center" rowspan="3">arm</td>
+<td>threaded</td>
+<td rowspan="2">
+<a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_dev_arm.yml">cron_dev_arm</a><br/>
+<a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_dev_arm_trace.yml">cron_dev_arm with trace_log</a>
+</td>
+<td>PASSED</td>
+</tr>
+<tr>
+<td>tokio-1.47.1 <br/>
+<a href="https://github.com/tokio-rs/tokio/issues/7632">tokio issue 7632 (opened)</a><br/>
+<a href="https://github.com/tokio-rs/tokio/pull/7622">tokio PR #7622 (unrelease)</a>
+</td>
+<td>DEADLOCK (not resolved)</td>
+</tr>
+<tr>
+<td>async-std</td>
+<td><a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master_async_std_arm.yml">cron_master_async_std_arm</a></td>
+<td>PASSED</td>
+</tr>
+<tr>
+<td rowspan="3">miri (emulation)</td>
+<td>threaded</td>
+<td rowspan="2"><a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/miri_dev.yml">miri_dev</a></td>
+<td>PASSED</td>
+</tr>
+<tr><td>tokio-1.47.1<br/><a href="https://github.com/tokio-rs/tokio/pull/7622">tokio PR #7622 (unrelease)</a> </td><td> DEBUGGING</td>
+</tr>
+<tr><td>async-std</td><td>-</td> <td> NOT supported by miri </td>
+</tr>
+</table>
+
+v2.0.26 (legacy):
+
+<table cellpadding="30">
+<tr><th>arch</th><th>runtime</th><th>workflow</th><th>status</th></tr>
+<tr>
+<td align="center" rowspan="3">x86_64</td>
+<td>threaded</td>
+<td rowspan="3">
+<a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_2.0_x86.yml">cron_2.0_x86</a></td>
+<td align="center" rowspan="3">PASSED</td>
+</tr>
+<tr><td>tokio 1.47.1</td>
+</tr>
+<tr><td>async-std</td>
+</tr>
+<tr><td align="center" rowspan="3">arm</td>
+<td>threaded</td>
+<td align="center" rowspan="3">
+<a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_2.0_arm.yml">cron_2.0_arm</a>
+</td>
+<td align="center" rowspan="3">PASSED</td>
+<tr>
+<td>tokio-1.47.1</td>
+</tr>
+<tr><td>async-std</td>
+</tr>
+</table>
 
 ## APIs
 
