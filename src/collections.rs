@@ -110,6 +110,7 @@ impl<T> WeakCell<T> {
         }
     }
 
+    //// it is allow to fail, with only one shot and weak Ops
     #[inline(always)]
     pub fn clear(&self) -> bool {
         let v = self.ptr.load(Ordering::Acquire);
@@ -159,7 +160,12 @@ mod tests {
         assert!(Arc::ptr_eq(&item, &_item));
         cell.put(Arc::downgrade(&item));
         assert!(cell.exists());
-        cell.clear();
+        // it is allow to fail under miri
+        println!("clear");
+        while !cell.clear() {
+            assert!(cell.exists());
+            println!("try clear again");
+        }
         assert!(!cell.exists());
         drop(_item);
         assert_eq!(Arc::strong_count(&item), 1);
