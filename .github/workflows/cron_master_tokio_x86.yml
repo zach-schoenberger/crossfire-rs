@@ -1,4 +1,4 @@
-name: cron-master
+name: cron-master-tokio-x86
 
 on:
   schedule: [cron: "0 */5 * * *"]
@@ -20,8 +20,11 @@ jobs:
     - name: Run tests with tokio multi-thread
       run: env WORKFLOW=1 make test
 
-    - name: Run tests with tokio single-thread
+    - name: Run tests with tokio current-thread
       run: env WORKFLOW=1 SINGLE_THREAD_RUNTIME=1 make test
 
-    - name: Run tests with --release
+    - name: Run tests with tokio multi-thread --release
       run: env WORKFLOW=1 make test_release
+
+    - name: Run tests with tokio current-thread --release
+      run: env WORKFLOW=1 SINGLE_THREAD_RUNTIME=1 make test_release

@@ -1,0 +1,24 @@
+name: cron-master-threaded-x86
+
+on:
+  schedule: [cron: "20 */5 * * *"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_and_test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --verbose
+
+    - name: Run tests
+      run: env WORKFLOW=1 make test test_blocking_context
+
+    - name: Run tests with --release
+      run: env WORKFLOW=1 make test_release test_blocking_context
