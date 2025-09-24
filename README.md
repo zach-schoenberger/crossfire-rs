@@ -69,10 +69,11 @@ Some hidden bug (especially atomic ops on weaker ordering platform) might occur:
 <tr>
 <td align="center" rowspan="3">x86_64</td>
 <td>threaded</td>
-<td rowspan="2"><a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master.yml">cron_master</a> </td>
+<td><a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master_threaded_x86.yml">cron_master_threaded_x86</a> </td>
 <td>PASSED</td>
 </tr>
 <tr><td>tokio 1.47.1</td>
+<td><a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master_tokio_x86.yml">cron_master_tokio_x86</a></td>
 <td>PASSED</td>
 </tr>
 <tr><td>async-std</td>
@@ -81,9 +82,8 @@ Some hidden bug (especially atomic ops on weaker ordering platform) might occur:
 </tr>
 <tr><td align="center" rowspan="3">arm</td>
 <td>threaded</td>
-<td rowspan="2">
-<a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_dev_arm.yml">cron_dev_arm</a><br/>
-<a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_dev_arm_trace.yml">cron_dev_arm with trace_log</a>
+<td>
+<a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master_threaded_arm.yml">cron_master_threaded_arm</a><br/>
 </td>
 <td>PASSED</td>
 </tr>
@@ -91,6 +91,10 @@ Some hidden bug (especially atomic ops on weaker ordering platform) might occur:
 <td>tokio-1.47.1 <br/>
 <a href="https://github.com/tokio-rs/tokio/issues/7632">tokio issue 7632 (opened)</a><br/>
 <a href="https://github.com/tokio-rs/tokio/pull/7622">tokio PR #7622 (unrelease)</a>
+</td>
+<td>
+<a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_dev_arm.yml">cron_dev_arm</a><br/>
+<a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_dev_arm_trace.yml">cron_dev_arm with trace_log</a>
 </td>
 <td>DEADLOCK (not resolved)</td>
 </tr>
