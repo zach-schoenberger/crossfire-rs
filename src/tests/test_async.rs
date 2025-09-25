@@ -423,30 +423,23 @@ fn test_basic_unbounded_recv_after_sender_close<
 fn test_basic_timeout_recv_async_waker<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
-    #[cfg(feature = "tokio")]
-    {
-        let (tx, rx) = channel;
-        runtime_block_on!(async move {
-            for _ in 0..1000 {
-                assert!(tokio::time::timeout(Duration::from_millis(1), rx.recv()).await.is_err());
-            }
-            let (tx_wakers, rx_wakers) = rx.as_ref().get_wakers_count();
-            println!("wakers: {}, {}", tx_wakers, rx_wakers);
-            assert!(tx_wakers <= 1);
-            assert!(rx_wakers <= 1);
-            sleep(Duration::from_secs(1)).await;
-            let _ = tx.send(1).await;
-            assert_eq!(rx.recv().await.unwrap(), 1);
-            let (tx_wakers, rx_wakers) = rx.as_ref().get_wakers_count();
-            println!("wakers: {}, {}", tx_wakers, rx_wakers);
-            assert!(tx_wakers <= 1);
-            assert!(rx_wakers <= 1);
-        });
-    }
-    #[cfg(not(feature = "tokio"))]
-    {
-        println!("skipped")
-    }
+    let (tx, rx) = channel;
+    runtime_block_on!(async move {
+        for _ in 0..1000 {
+            assert!(rx.recv_with_timer(sleep(Duration::from_millis(1))).await.is_err());
+        }
+        let (tx_wakers, rx_wakers) = rx.as_ref().get_wakers_count();
+        println!("wakers: {}, {}", tx_wakers, rx_wakers);
+        assert!(tx_wakers <= 1);
+        assert!(rx_wakers <= 1);
+        sleep(Duration::from_secs(1)).await;
+        let _ = tx.send(1).await;
+        assert_eq!(rx.recv().await.unwrap(), 1);
+        let (tx_wakers, rx_wakers) = rx.as_ref().get_wakers_count();
+        println!("wakers: {}, {}", tx_wakers, rx_wakers);
+        assert!(tx_wakers <= 1);
+        assert!(rx_wakers <= 1);
+    });
 }
 
 #[logfn]
@@ -457,30 +450,23 @@ fn test_basic_timeout_recv_async_waker<T: AsyncTxTrait<usize>, R: AsyncRxTrait<u
 fn test_basic_unbounded_recv_timeout_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] _channel: (T, R),
 ) {
-    #[cfg(any(feature = "tokio", feature = "async_std"))]
-    {
-        let (tx, rx) = _channel;
-        runtime_block_on!(async move {
-            let th = async_spawn!(async move {
-                sleep(Duration::from_millis(200)).await;
-                let _ = tx.send(1);
-            });
-            assert_eq!(
-                rx.recv_timeout(Duration::from_millis(1)).await.unwrap_err(),
-                RecvTimeoutError::Timeout
-            );
-            let _ = async_join_result!(th);
-            let (tx_wakers, rx_wakers) = rx.as_ref().get_wakers_count();
-            println!("wakers: {}, {}", tx_wakers, rx_wakers);
-            assert_eq!(tx_wakers, 0);
-            assert_eq!(rx_wakers, 0);
-            assert_eq!(rx.recv_timeout(Duration::from_millis(2)).await.unwrap(), 1);
+    let (tx, rx) = _channel;
+    runtime_block_on!(async move {
+        let th = async_spawn!(async move {
+            sleep(Duration::from_millis(200)).await;
+            let _ = tx.send(1);
         });
-    }
-    #[cfg(not(any(feature = "tokio", feature = "async_std")))]
-    {
-        println!("skipped");
-    }
+        assert_eq!(
+            rx.recv_with_timer(sleep(Duration::from_millis(1))).await.unwrap_err(),
+            RecvTimeoutError::Timeout
+        );
+        let _ = async_join_result!(th);
+        let (tx_wakers, rx_wakers) = rx.as_ref().get_wakers_count();
+        println!("wakers: {}, {}", tx_wakers, rx_wakers);
+        assert_eq!(tx_wakers, 0);
+        assert_eq!(rx_wakers, 0);
+        assert_eq!(rx.recv_with_timer(sleep(Duration::from_millis(2))).await.unwrap(), 1);
+    });
 }
 
 #[logfn]
@@ -491,56 +477,49 @@ fn test_basic_unbounded_recv_timeout_async<T: BlockingTxTrait<usize>, R: AsyncRx
 fn test_basic_send_timeout_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] _channel: (T, R),
 ) {
-    #[cfg(any(feature = "tokio", feature = "async_std"))]
-    {
-        let (tx, rx) = _channel;
-        for i in 0..10 {
-            assert!(tx.try_send(i).is_ok());
-        }
+    let (tx, rx) = _channel;
+    for i in 0..10 {
+        assert!(tx.try_send(i).is_ok());
+    }
 
-        runtime_block_on!(async move {
-            assert_eq!(
-                tx.send_timeout(11, Duration::from_millis(1)).await.unwrap_err(),
-                SendTimeoutError::Timeout(11)
-            );
-            let th = async_spawn!(async move {
-                loop {
-                    sleep(Duration::from_millis(2)).await;
-                    if let Err(_) = rx.recv().await {
-                        println!("tx dropped");
-                        break;
-                    }
-                }
-            });
-            let mut try_times = 0;
+    runtime_block_on!(async move {
+        assert_eq!(
+            tx.send_with_timer(11, sleep(Duration::from_millis(1))).await.unwrap_err(),
+            SendTimeoutError::Timeout(11)
+        );
+        let th = async_spawn!(async move {
             loop {
-                try_times += 1;
-                match tx.send_timeout(11, Duration::from_millis(1)).await {
-                    Ok(_) => {
-                        println!("send ok after {} tries", try_times);
-                        break;
-                    }
-                    Err(SendTimeoutError::Timeout(msg)) => {
-                        println!("timeout");
-                        assert_eq!(msg, 11);
-                    }
-                    Err(SendTimeoutError::Disconnected(_)) => {
-                        unreachable!();
-                    }
+                sleep(Duration::from_millis(2)).await;
+                if let Err(_) = rx.recv().await {
+                    println!("tx dropped");
+                    break;
                 }
             }
-            let (tx_wakers, rx_wakers) = tx.as_ref().get_wakers_count();
-            println!("wakers: {}, {}", tx_wakers, rx_wakers);
-            assert!(tx_wakers <= 1, "{:?}", tx_wakers);
-            assert!(rx_wakers <= 1, "{:?}", rx_wakers);
-            drop(tx);
-            let _ = async_join_result!(th);
         });
-    }
-    #[cfg(not(any(feature = "tokio", feature = "async_std")))]
-    {
-        println!("skipped");
-    }
+        let mut try_times = 0;
+        loop {
+            try_times += 1;
+            match tx.send_with_timer(11, sleep(Duration::from_millis(1))).await {
+                Ok(_) => {
+                    println!("send ok after {} tries", try_times);
+                    break;
+                }
+                Err(SendTimeoutError::Timeout(msg)) => {
+                    println!("timeout");
+                    assert_eq!(msg, 11);
+                }
+                Err(SendTimeoutError::Disconnected(_)) => {
+                    unreachable!();
+                }
+            }
+        }
+        let (tx_wakers, rx_wakers) = tx.as_ref().get_wakers_count();
+        println!("wakers: {}, {}", tx_wakers, rx_wakers);
+        assert!(tx_wakers <= 1, "{:?}", tx_wakers);
+        assert!(rx_wakers <= 1, "{:?}", rx_wakers);
+        drop(tx);
+        let _ = async_join_result!(th);
+    });
 }
 
 #[logfn]
@@ -549,127 +528,120 @@ fn test_basic_send_timeout_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>
 fn test_pressure_bounded_timeout_async(
     setup_log: (), #[case] _channel: (MAsyncTx<usize>, MAsyncRx<usize>),
 ) {
-    #[cfg(any(feature = "tokio", feature = "async_std"))]
-    {
-        use parking_lot::Mutex;
-        use std::collections::HashMap;
-        let (tx, rx) = _channel;
-        let tx_count: usize = 3;
-        let rx_count: usize = 2;
+    use parking_lot::Mutex;
+    use std::collections::HashMap;
+    let (tx, rx) = _channel;
+    let tx_count: usize = 3;
+    let rx_count: usize = 2;
 
-        runtime_block_on!(async move {
-            assert_eq!(
-                rx.recv_timeout(Duration::from_millis(1)).await.unwrap_err(),
-                RecvTimeoutError::Timeout
-            );
-            let (tx_wakers, rx_wakers) = rx.as_ref().get_wakers_count();
-            println!("wakers: {}, {}", tx_wakers, rx_wakers);
-            assert_eq!(tx_wakers, 0);
-            assert_eq!(rx_wakers, 0);
+    runtime_block_on!(async move {
+        assert_eq!(
+            rx.recv_with_timer(sleep(Duration::from_millis(1))).await.unwrap_err(),
+            RecvTimeoutError::Timeout
+        );
+        let (tx_wakers, rx_wakers) = rx.as_ref().get_wakers_count();
+        println!("wakers: {}, {}", tx_wakers, rx_wakers);
+        assert_eq!(tx_wakers, 0);
+        assert_eq!(rx_wakers, 0);
 
-            let recv_map = Arc::new(Mutex::new(HashMap::new()));
+        let recv_map = Arc::new(Mutex::new(HashMap::new()));
 
-            let mut th_tx = Vec::new();
-            let mut th_rx = Vec::new();
+        let mut th_tx = Vec::new();
+        let mut th_rx = Vec::new();
 
-            for thread_id in 0..tx_count {
-                let _recv_map = recv_map.clone();
-                let _tx = tx.clone();
-                th_tx.push(async_spawn!(async move {
-                    let mut local_send_timeout_count = 0;
-                    let mut i = 0;
-                    // randomize start up
-                    sleep(Duration::from_millis((thread_id & 3) as u64)).await;
+        for thread_id in 0..tx_count {
+            let _recv_map = recv_map.clone();
+            let _tx = tx.clone();
+            th_tx.push(async_spawn!(async move {
+                let mut local_send_timeout_count = 0;
+                let mut i = 0;
+                // randomize start up
+                sleep(Duration::from_millis((thread_id & 3) as u64)).await;
+                loop {
+                    if i >= ROUND {
+                        return local_send_timeout_count;
+                    }
+                    {
+                        let mut guard = _recv_map.lock();
+                        guard.insert(i, ());
+                    }
+                    if i & 2 == 0 {
+                        sleep(Duration::from_millis(3)).await;
+                    } else {
+                        sleep(Duration::from_millis(1)).await;
+                    }
                     loop {
-                        if i >= ROUND {
-                            return local_send_timeout_count;
-                        }
-                        {
-                            let mut guard = _recv_map.lock();
-                            guard.insert(i, ());
-                        }
-                        if i & 2 == 0 {
-                            sleep(Duration::from_millis(3)).await;
-                        } else {
-                            sleep(Duration::from_millis(1)).await;
-                        }
-                        loop {
-                            match _tx.send_timeout(i, Duration::from_millis(1)).await {
-                                Ok(_) => {
-                                    i += 1;
-                                    break;
-                                }
-                                Err(SendTimeoutError::Timeout(_i)) => {
-                                    local_send_timeout_count += 1;
-                                    assert_eq!(_i, i);
-                                }
-                                Err(SendTimeoutError::Disconnected(_)) => {
-                                    unreachable!();
-                                }
+                        match _tx.send_with_timer(i, sleep(Duration::from_millis(1))).await {
+                            Ok(_) => {
+                                i += 1;
+                                break;
+                            }
+                            Err(SendTimeoutError::Timeout(_i)) => {
+                                local_send_timeout_count += 1;
+                                assert_eq!(_i, i);
+                            }
+                            Err(SendTimeoutError::Disconnected(_)) => {
+                                unreachable!();
                             }
                         }
                     }
-                }));
-            }
+                }
+            }));
+        }
 
-            for _thread_id in 0..rx_count {
-                let _rx = rx.clone();
-                let _recv_map = recv_map.clone();
-                th_rx.push(async_spawn!(async move {
-                    let mut step: usize = 0;
-                    let mut local_recv_count: usize = 0;
-                    let mut local_recv_timeout_count: usize = 0;
-                    loop {
-                        step += 1;
-                        let timeout = if step & 2 == 0 { 1 } else { 2 };
-                        if step & 2 > 0 {
-                            sleep(Duration::from_millis(1)).await;
+        for _thread_id in 0..rx_count {
+            let _rx = rx.clone();
+            let _recv_map = recv_map.clone();
+            th_rx.push(async_spawn!(async move {
+                let mut step: usize = 0;
+                let mut local_recv_count: usize = 0;
+                let mut local_recv_timeout_count: usize = 0;
+                loop {
+                    step += 1;
+                    let timeout = if step & 2 == 0 { 1 } else { 2 };
+                    if step & 2 > 0 {
+                        sleep(Duration::from_millis(1)).await;
+                    }
+                    match _rx.recv_with_timer(sleep(Duration::from_millis(timeout))).await {
+                        Ok(item) => {
+                            local_recv_count += 1;
+                            {
+                                let mut guard = _recv_map.lock();
+                                guard.remove(&item);
+                            }
                         }
-                        match _rx.recv_timeout(Duration::from_millis(timeout)).await {
-                            Ok(item) => {
-                                local_recv_count += 1;
-                                {
-                                    let mut guard = _recv_map.lock();
-                                    guard.remove(&item);
-                                }
-                            }
-                            Err(RecvTimeoutError::Timeout) => {
-                                local_recv_timeout_count += 1;
-                            }
-                            Err(RecvTimeoutError::Disconnected) => {
-                                return (local_recv_count, local_recv_timeout_count);
-                            }
+                        Err(RecvTimeoutError::Timeout) => {
+                            local_recv_timeout_count += 1;
+                        }
+                        Err(RecvTimeoutError::Disconnected) => {
+                            return (local_recv_count, local_recv_timeout_count);
                         }
                     }
-                }));
-            }
-            drop(tx);
-            drop(rx);
+                }
+            }));
+        }
+        drop(tx);
+        drop(rx);
 
-            let mut total_send_timeout_count = 0;
-            for th in th_tx {
-                total_send_timeout_count += async_join_result!(th);
-            }
-            let mut total_recv_count = 0;
-            let mut total_recv_timeout_count = 0;
-            for th in th_rx {
-                let (recv_count, recv_timeout_count) = async_join_result!(th);
-                total_recv_count += recv_count;
-                total_recv_timeout_count += recv_timeout_count;
-            }
-            {
-                let guard = recv_map.lock();
-                assert!(guard.is_empty());
-            }
-            assert_eq!(ROUND * tx_count, total_recv_count);
-            println!("send timeout count: {}", total_send_timeout_count);
-            println!("recv timeout count: {}", total_recv_timeout_count);
-        });
-    }
-    #[cfg(not(any(feature = "tokio", feature = "async_std")))]
-    {
-        println!("skipped");
-    }
+        let mut total_send_timeout_count = 0;
+        for th in th_tx {
+            total_send_timeout_count += async_join_result!(th);
+        }
+        let mut total_recv_count = 0;
+        let mut total_recv_timeout_count = 0;
+        for th in th_rx {
+            let (recv_count, recv_timeout_count) = async_join_result!(th);
+            total_recv_count += recv_count;
+            total_recv_timeout_count += recv_timeout_count;
+        }
+        {
+            let guard = recv_map.lock();
+            assert!(guard.is_empty());
+        }
+        assert_eq!(ROUND * tx_count, total_recv_count);
+        println!("send timeout count: {}", total_send_timeout_count);
+        println!("recv timeout count: {}", total_recv_timeout_count);
+    });
 }
 
 #[logfn]
