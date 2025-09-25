@@ -41,10 +41,18 @@ async-channel = {version="2.5.0"}
 
 [features]
 default = []
+
+# This will enable timeout function, and tokio is the default runtime in benchmark and test workflow
 tokio = ["dep:tokio"]
+
+# This will enable timeout function, switch runtime in benchmark and test workflow.
 async_std = ["dep:async-std"]
-smol = ["dep:smol"] # for test workflow
-trace_log = ["dep:log"] # for test workflow
+
+# This only switch runtime in benchmark and test workflow.
+smol = ["dep:smol"]
+
+# for test workflow debugging
+trace_log = ["dep:log"]
 
 [package.metadata.docs.rs]
 all-features = true
