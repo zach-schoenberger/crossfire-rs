@@ -10,7 +10,7 @@ async fn _tokio_bounded_mpsc(bound: usize, tx_count: usize, msg_count: usize) {
     let _send_counter = msg_count / tx_count;
     for _tx_i in 0..tx_count {
         let _tx = tx.clone();
-        tokio::spawn(async move {
+        async_spawn!(async move {
             for i in 0.._send_counter {
                 let _ = _tx.send(i).await;
             }
@@ -32,7 +32,7 @@ async fn _tokio_unbounded_mpsc(tx_count: usize, msg_count: usize) {
     let _send_counter = msg_count / tx_count;
     for _tx_i in 0..tx_count {
         let _tx = tx.clone();
-        tokio::spawn(async move {
+        async_spawn!(async move {
             for i in 0.._send_counter {
                 let _ = _tx.send(i);
             }
@@ -56,7 +56,7 @@ fn bench_tokio_bounded(c: &mut Criterion) {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpsc", input), &param, |b, i| {
-            b.to_async(get_runtime()).iter(|| _tokio_bounded_mpsc(100, i.tx_count, ONE_MILLION))
+            b.to_async(BenchExecutor()).iter(|| _tokio_bounded_mpsc(100, i.tx_count, ONE_MILLION))
         });
     }
     group.finish();
@@ -70,7 +70,7 @@ fn bench_tokio_unbounded(c: &mut Criterion) {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpsc", input), &param, |b, i| {
-            b.to_async(get_runtime()).iter(|| _tokio_unbounded_mpsc(i.tx_count, ONE_MILLION))
+            b.to_async(BenchExecutor()).iter(|| _tokio_unbounded_mpsc(i.tx_count, ONE_MILLION))
         });
     }
     group.finish();

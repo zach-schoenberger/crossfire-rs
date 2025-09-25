@@ -71,7 +71,7 @@ macro_rules! bench_bounded_async {
             BenchmarkId::new(format!("{}_{}", $name, $size).to_string(), &param),
             &param,
             |b, i| {
-                b.to_async(get_runtime()).iter(async || {
+                b.to_async(BenchExecutor()).iter(async || {
                     let (tx, rx) = $new($size);
                     _crossfire_bounded_async(
                         tx.clone_to_vec(i.tx_count),
@@ -98,7 +98,7 @@ macro_rules! bench_unbounded_async {
             BenchmarkId::new(format!("{}", $name).to_string(), &param),
             &param,
             |b, i| {
-                b.to_async(get_runtime()).iter(async || {
+                b.to_async(BenchExecutor()).iter(async || {
                     let (tx, rx) = $new();
                     _crossfire_blocking_async(
                         tx.clone_to_vec(i.tx_count),
@@ -187,7 +187,7 @@ async fn _crossfire_blocking_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<us
     let mut th_rx = Vec::new();
     for _ in 0..(rx_count - 1) {
         let _rx = rxs.pop().unwrap();
-        th_rx.push(tokio::spawn(async move {
+        th_rx.push(async_spawn!(async move {
             let mut i = 0;
             loop {
                 match _rx.recv().await {
@@ -218,7 +218,7 @@ async fn _crossfire_blocking_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<us
         let _ = th.join();
     }
     for th in th_rx {
-        recv_counter += th.await.unwrap();
+        recv_counter += async_join_result!(th);
     }
     assert_eq!(send_counter, recv_counter);
 }
@@ -232,7 +232,7 @@ async fn _crossfire_bounded_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>
     let mut th_rx = Vec::new();
     for tx in txs {
         send_counter += _send_counter;
-        th_tx.push(tokio::spawn(async move {
+        th_tx.push(async_spawn!(async move {
             for i in 0.._send_counter {
                 if let Err(e) = tx.send(i).await {
                     panic!("send error: {:?}", e);
@@ -244,7 +244,7 @@ async fn _crossfire_bounded_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>
     let rx_count = rxs.len();
     for _ in 0..(rx_count - 1) {
         let _rx = rxs.pop().unwrap();
-        th_rx.push(tokio::spawn(async move {
+        th_rx.push(async_spawn!(async move {
             let mut i = 0;
             loop {
                 match _rx.recv().await {
@@ -274,7 +274,7 @@ async fn _crossfire_bounded_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>
         let _ = th.await;
     }
     for th in th_rx {
-        recv_counter += th.await.unwrap();
+        recv_counter += async_join_result!(th);
     }
     assert_eq!(send_counter, recv_counter);
 }

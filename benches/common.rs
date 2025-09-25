@@ -1,5 +1,7 @@
 use std::fmt;
-use tokio::runtime::Runtime;
+use std::future::Future;
+
+use criterion::async_executor::AsyncExecutor;
 
 #[allow(dead_code)]
 pub const ONE_MILLION: usize = 1000000;
@@ -18,7 +20,76 @@ impl fmt::Display for Concurrency {
     }
 }
 
-#[allow(dead_code)]
-pub fn get_runtime() -> Runtime {
-    tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap()
+pub struct BenchExecutor();
+
+impl AsyncExecutor for BenchExecutor {
+    fn block_on<T>(&self, future: impl Future<Output = T>) -> T {
+        #[cfg(feature = "smol")]
+        {
+            use std::num::NonZero;
+            use std::thread;
+            let num_threads = thread::available_parallelism().unwrap_or(NonZero::new(1).unwrap());
+            unsafe { std::env::set_var("SMOL_THREADS", num_threads.to_string()) };
+            smol::block_on(future)
+        }
+        #[cfg(not(feature = "smol"))]
+        {
+            #[cfg(feature = "async_std")]
+            {
+                async_std::task::block_on(future)
+            }
+            #[cfg(not(feature = "async_std"))]
+            {
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(future)
+            }
+        }
+    }
 }
+
+#[allow(dead_code)]
+macro_rules! async_spawn {
+    ($f: expr) => {{
+        #[cfg(feature = "smol")]
+        {
+            smol::spawn($f)
+        }
+        #[cfg(not(feature = "smol"))]
+        {
+            #[cfg(feature = "async_std")]
+            {
+                async_std::task::spawn($f)
+            }
+            #[cfg(any(feature = "tokio", not(feature = "async_std")))]
+            {
+                tokio::spawn($f)
+            }
+        }
+    }};
+}
+pub(super) use async_spawn;
+
+#[allow(dead_code)]
+macro_rules! async_join_result {
+    ($th: expr) => {{
+        #[cfg(feature = "smol")]
+        {
+            $th.await
+        }
+        #[cfg(not(feature = "smol"))]
+        {
+            #[cfg(feature = "async_std")]
+            {
+                $th.await
+            }
+            #[cfg(not(feature = "async_std"))]
+            {
+                $th.await.expect("join")
+            }
+        }
+    }};
+}
+pub(super) use async_join_result;

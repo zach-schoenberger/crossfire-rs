@@ -24,6 +24,7 @@ parking_lot = "0"
 tokio = { version = "1", features = ["time", "rt"], optional=true }
 async-std = {version = "1", optional=true}
 log = { version="0", optional=true}
+smol = {version = "2", optional=true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["time", "sync", "rt-multi-thread", "rt", "macros"] }
@@ -31,7 +32,7 @@ rand = "0.9"
 rstest = "0"
 captains-log = {version="0.13", features = ["ringfile", "tracing"] }
 log = "0"
-criterion2 = { version="3.0.2", features = ["async_tokio"] }
+criterion2 = { version="3.0.2", features = ["async"]}
 crossbeam-channel = "0.5"
 
 flume = {version="0.11", features= ["async"] }
@@ -42,6 +43,7 @@ async-channel = {version="2.5.0"}
 default = []
 tokio = ["dep:tokio"]
 async_std = ["dep:async-std"]
+smol = ["dep:smol"]
 trace_log = ["dep:log"] # for test workflow
 
 [package.metadata.docs.rs]

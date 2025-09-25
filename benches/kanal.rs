@@ -124,7 +124,7 @@ async fn _kanal_bounded_async(bound: usize, tx_count: usize, rx_count: usize, ms
     for _tx_i in 0..tx_count {
         send_counter += _send_counter;
         let _tx = tx.clone();
-        th_tx.push(tokio::spawn(async move {
+        th_tx.push(async_spawn!(async move {
             for i in 0.._send_counter {
                 if let Err(e) = _tx.send(i).await {
                     panic!("send error: {:?}", e);
@@ -136,7 +136,7 @@ async fn _kanal_bounded_async(bound: usize, tx_count: usize, rx_count: usize, ms
     let mut recv_counter = 0;
     for _ in 0..(rx_count - 1) {
         let _rx = rx.clone();
-        th_rx.push(tokio::spawn(async move {
+        th_rx.push(async_spawn!(async move {
             let mut i = 0;
             loop {
                 match _rx.recv().await {
@@ -165,7 +165,7 @@ async fn _kanal_bounded_async(bound: usize, tx_count: usize, rx_count: usize, ms
         let _ = th.await;
     }
     for th in th_rx {
-        if let Ok(count) = th.await {
+        if let Ok(count) = async_join_result!(th) {
             recv_counter += count;
         }
     }
@@ -181,7 +181,7 @@ async fn _kanal_unbounded_async(tx_count: usize, rx_count: usize, msg_count: usi
     for _tx_i in 0..tx_count {
         send_counter += _send_counter;
         let _tx = tx.clone();
-        th_tx.push(tokio::spawn(async move {
+        th_tx.push(async_spawn!(async move {
             for i in 0.._send_counter {
                 if let Err(e) = _tx.send(i).await {
                     panic!("send error: {:?}", e);
@@ -193,7 +193,7 @@ async fn _kanal_unbounded_async(tx_count: usize, rx_count: usize, msg_count: usi
     let mut recv_counter = 0;
     for _ in 0..(rx_count - 1) {
         let _rx = rx.clone();
-        th_rx.push(tokio::spawn(async move {
+        th_rx.push(async_spawn!(async move {
             let mut i = 0;
             loop {
                 match _rx.recv().await {
@@ -223,7 +223,7 @@ async fn _kanal_unbounded_async(tx_count: usize, rx_count: usize, msg_count: usi
         let _ = th.await;
     }
     for th in th_rx {
-        if let Ok(count) = th.await {
+        if let Ok(count) = async_join_result!(th) {
             recv_counter += count;
         }
     }
@@ -285,7 +285,7 @@ fn bench_kanal_bounded_async(c: &mut Criterion) {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(TEN_THOUSAND as u64));
         group.bench_with_input(BenchmarkId::new("mpsc size 1", &param), &param, |b, i| {
-            b.to_async(get_runtime())
+            b.to_async(BenchExecutor())
                 .iter(|| _kanal_bounded_async(1, i.tx_count, i.rx_count, TEN_THOUSAND))
         });
     }
@@ -294,7 +294,7 @@ fn bench_kanal_bounded_async(c: &mut Criterion) {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpsc size 100", &param), &param, |b, i| {
-            b.to_async(get_runtime())
+            b.to_async(BenchExecutor())
                 .iter(|| _kanal_bounded_async(100, i.tx_count, i.rx_count, ONE_MILLION))
         });
     }
@@ -302,7 +302,7 @@ fn bench_kanal_bounded_async(c: &mut Criterion) {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpmc size 100", &param), &param, |b, i| {
-            b.to_async(get_runtime())
+            b.to_async(BenchExecutor())
                 .iter(|| _kanal_bounded_async(100, i.tx_count, i.rx_count, ONE_MILLION))
         });
     }
@@ -316,7 +316,7 @@ fn bench_kanal_unbounded_async(c: &mut Criterion) {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpsc", &param), &param, |b, i| {
-            b.to_async(get_runtime())
+            b.to_async(BenchExecutor())
                 .iter(|| _kanal_unbounded_async(i.tx_count, i.rx_count, ONE_MILLION))
         });
     }
@@ -324,7 +324,7 @@ fn bench_kanal_unbounded_async(c: &mut Criterion) {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpmc", &param), &param, |b, i| {
-            b.to_async(get_runtime())
+            b.to_async(BenchExecutor())
                 .iter(|| _kanal_unbounded_async(i.tx_count, i.rx_count, ONE_MILLION))
         });
     }
