@@ -27,7 +27,7 @@ For the concept, please refer to the [wiki](https://github.com/frostyplanet/cros
 by removing generic types from the ChannelShared type, which made it easier to code with.
 
 * v2.1: Released in 2025.9. Removed the dependency on crossbeam-channel and
-implemented a modified version of crossbeam-queue, which brings performance
+implemented with a [modified version of crossbeam-queue](https://github.com/frostyplanet/crossfire-rs/wiki/crossbeam-related), which brings performance
 improvements for both async and blocking contexts.
 
 
@@ -67,7 +67,7 @@ Some hidden bug (especially atomic ops on weaker ordering platform) might occur:
 <table cellpadding="30">
 <tr><th>arch</th><th>runtime</th><th>workflow</th><th>status</th></tr>
 <tr>
-<td align="center" rowspan="3">x86_64</td>
+<td align="center" rowspan="4">x86_64</td>
 <td>threaded</td>
 <td><a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master_threaded_x86.yml">cron_master_threaded_x86</a> </td>
 <td>PASSED</td>
@@ -80,7 +80,10 @@ Some hidden bug (especially atomic ops on weaker ordering platform) might occur:
 <td><a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master_async_std_x86.yml">cron_master_async_std_x86</a></td>
 <td>PASSED</td>
 </tr>
-<tr><td align="center" rowspan="3">arm</td>
+<tr><td>smol</td>
+<td><a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master_smol_x86.yml">cron_master_smol-x86</a></td>
+<td>PASSED</td>
+<tr><td align="center" rowspan="4">arm</td>
 <td>threaded</td>
 <td>
 <a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master_threaded_arm.yml">cron_master_threaded_arm</a><br/>
@@ -101,6 +104,11 @@ Some hidden bug (especially atomic ops on weaker ordering platform) might occur:
 <tr>
 <td>async-std</td>
 <td><a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master_async_std_arm.yml">cron_master_async_std_arm</a></td>
+<td>PASSED</td>
+</tr>
+<tr>
+<td>smol</td>
+<td><a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_master_smol_arm.yml">cron_master_smol_arm</a> </td>
 <td>PASSED</td>
 </tr>
 <tr>

@@ -18,7 +18,7 @@
 //! by removing generic types from the ChannelShared type, which made it easier to code with.
 //!
 //! * v2.1: Released in 2025.9. Removed the dependency on crossbeam-channel
-//! and implemented with a modified version of crossbeam-queue,
+//! and implemented with [a modified version of crossbeam-queue](https://github.com/frostyplanet/crossfire-rs/wiki/crossbeam-related),
 //! which brings performance improvements for both async and blocking contexts.
 //!
 //! ## Test status
