@@ -136,10 +136,12 @@
 //!
 //! * When the "tokio" or "async_std" feature is enabled, we also provide two additional functions:
 //!
-//! - [send_timeout](crate::AsyncTx::send_timeout()), which will return the message that failed to be sent in
-//! [SendTimeoutError]. We guarantee the result is atomic.
+//! - [send_timeout()](crate::AsyncTx::send_timeout()), which will return the message that failed to be sent in
+//! [SendTimeoutError]. We guarantee the result is atomic. Alternatively, you can use
+//! [send_with_timer()](crate::AsyncTx::send_with_timer()).
 //!
-//! - [recv_timeout](crate::AsyncRx::recv_timeout()), we guarantee the result is atomic.
+//! - [recv_timeout()](crate::AsyncRx::recv_timeout()), we guarantee the result is atomic.
+//! Alternatively, you can use [recv_with_timer()](crate::AsyncRx::recv_with_timer())
 //!
 //! * Between blocking context and async context, and between different async runtime instances.
 //!

@@ -160,7 +160,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
     /// Sends a message with a timeout.
     /// Will await when channel is full.
     ///
-    /// The behavior is atomic: the message is either sent successfully or returned on error.
+    /// The behavior is atomic: the message is either sent successfully or returned with error.
     ///
     /// Returns `Ok(())` when successful.
     ///
@@ -172,18 +172,68 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
     #[inline]
     pub fn send_timeout<'a>(
         &'a self, item: T, duration: std::time::Duration,
-    ) -> SendTimeoutFuture<'a, T> {
+    ) -> SendTimeoutFuture<'a, T, ()> {
         let sleep = {
             #[cfg(feature = "tokio")]
             {
-                Box::pin(tokio::time::sleep(duration))
+                tokio::time::sleep(duration)
             }
-            #[cfg(not(feature = "tokio"))]
+            #[cfg(feature = "async_std")]
             {
-                Box::pin(async_std::task::sleep(duration))
+                async_std::task::sleep(duration)
             }
         };
-        return SendTimeoutFuture { tx: &self, item: MaybeUninit::new(item), waker: None, sleep };
+        self.send_with_timer(item, sleep)
+    }
+
+    /// Sends a message with a custom timer function (from other async runtime).
+    ///
+    /// The behavior is atomic: the message is either sent successfully or returned with error.
+    ///
+    /// Returns `Ok(())` when successful.
+    ///
+    /// Returns Err([SendTimeoutError::Timeout]) if the operation timed out. The error contains the message that failed to be sent.
+    ///
+    /// Returns Err([SendTimeoutError::Disconnected]) if the receiver has been dropped. The error contains the message that failed to be sent.
+    ///
+    /// # Argument:
+    ///
+    /// * `fut`: The sleep function. It's possible to wrap this function with cancelable handle,
+    /// you can control when to stop polling. the return value of `fut` is ignore.
+    /// We add generic `R` just in order to support smol::Timer.
+    ///
+    /// # Example:
+    ///
+    /// ```ignore
+    /// extern crate smol;
+    /// use std::time::Duration;
+    /// use crossfire::*;
+    /// async fn foo() {
+    ///     let (tx, rx) = mpmc::bounded_async::<usize>(10);
+    ///     match tx.send_with_timer(1, smol::Timer::after(Duration::from_secs(1))).await {
+    ///         Ok(_)=>{
+    ///             println!("message sent");
+    ///         }
+    ///         Err(SendTimeoutError::Timeout(_item))=>{
+    ///             println!("send timeout");
+    ///         }
+    ///         Err(SendTimeoutError::Disconnected(_item))=>{
+    ///             println!("receiver-side closed");
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    pub fn send_with_timer<'a, F, R>(&'a self, item: T, fut: F) -> SendTimeoutFuture<'a, T, R>
+    where
+        F: Future<Output = R> + 'static,
+    {
+        SendTimeoutFuture {
+            tx: &self,
+            item: MaybeUninit::new(item),
+            waker: None,
+            sleep: Box::pin(fut),
+        }
     }
 
     /// Internal function might change in the future. For public version, use AsyncSink::poll_send() instead.
@@ -320,16 +370,16 @@ impl<T: Unpin + Send + 'static> Future for SendFuture<'_, T> {
 }
 
 /// A fixed-sized future object constructed by [AsyncTx::send_timeout()]
-pub struct SendTimeoutFuture<'a, T: Unpin> {
+pub struct SendTimeoutFuture<'a, T: Unpin, R> {
     tx: &'a AsyncTx<T>,
-    sleep: Pin<Box<dyn Future<Output = ()>>>,
+    sleep: Pin<Box<dyn Future<Output = R>>>,
     item: MaybeUninit<T>,
     waker: Option<SendWaker<T>>,
 }
 
-unsafe impl<T: Unpin + Send> Send for SendTimeoutFuture<'_, T> {}
+unsafe impl<T: Unpin + Send, R> Send for SendTimeoutFuture<'_, T, R> {}
 
-impl<T: Unpin> Drop for SendTimeoutFuture<'_, T> {
+impl<T: Unpin, R> Drop for SendTimeoutFuture<'_, T, R> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
             // Cancelling the future, poll is not ready
@@ -342,7 +392,7 @@ impl<T: Unpin> Drop for SendTimeoutFuture<'_, T> {
     }
 }
 
-impl<T: Unpin + Send + 'static> Future for SendTimeoutFuture<'_, T> {
+impl<T: Unpin + Send + 'static, R> Future for SendTimeoutFuture<'_, T, R> {
     type Output = Result<(), SendTimeoutError<T>>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
@@ -359,7 +409,7 @@ impl<T: Unpin + Send + 'static> Future for SendTimeoutFuture<'_, T> {
                 })));
             }
             Poll::Pending => {
-                if let Poll::Ready(()) = _self.sleep.as_mut().poll(ctx) {
+                if let Poll::Ready(_) = _self.sleep.as_mut().poll(ctx) {
                     if let Some(waker) = _self.waker.take() {
                         if _self.tx.shared.abandon_send_waker(waker) {
                             return Poll::Ready(Err(SendTimeoutError::Timeout(unsafe {
@@ -445,7 +495,28 @@ pub trait AsyncTxTrait<T: Unpin + Send + 'static>:
     #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     fn send_timeout<'a>(
         &'a self, item: T, duration: std::time::Duration,
-    ) -> SendTimeoutFuture<'a, T>;
+    ) -> SendTimeoutFuture<'a, T, ()>;
+
+    /// Sends a message with a custom timer function.
+    /// Will await when channel is full.
+    ///
+    /// The behavior is atomic: the message is either sent successfully or returned with error.
+    ///
+    /// Returns `Ok(())` when successful.
+    ///
+    /// Returns Err([SendTimeoutError::Timeout]) if the operation timed out. The error contains the message that failed to be sent.
+    ///
+    /// Returns Err([SendTimeoutError::Disconnected]) if the receiver has been dropped. The error contains the message that failed to be sent.
+    ///
+    /// # Argument:
+    ///
+    /// * `fut`: The sleep function. It's possible to wrap this function with cancelable handle,
+    /// you can control when to stop polling. the return value of `fut` is ignore.
+    /// We add generic `R` just in order to support smol::Timer
+
+    fn send_with_timer<'a, F, R>(&'a self, item: T, fut: F) -> SendTimeoutFuture<'a, T, R>
+    where
+        F: Future<Output = R> + 'static;
 }
 
 impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for AsyncTx<T> {
@@ -470,8 +541,16 @@ impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for AsyncTx<T> {
     #[inline(always)]
     fn send_timeout<'a>(
         &'a self, item: T, duration: std::time::Duration,
-    ) -> SendTimeoutFuture<'a, T> {
+    ) -> SendTimeoutFuture<'a, T, ()> {
         AsyncTx::send_timeout(self, item, duration)
+    }
+
+    #[inline(always)]
+    fn send_with_timer<'a, F, R>(&'a self, item: T, fut: F) -> SendTimeoutFuture<'a, T, R>
+    where
+        F: Future<Output = R> + 'static,
+    {
+        AsyncTx::send_with_timer(self, item, fut)
     }
 }
 
@@ -577,8 +656,16 @@ impl<T: Unpin + Send + 'static> AsyncTxTrait<T> for MAsyncTx<T> {
     #[inline(always)]
     fn send_timeout<'a>(
         &'a self, item: T, duration: std::time::Duration,
-    ) -> SendTimeoutFuture<'a, T> {
+    ) -> SendTimeoutFuture<'a, T, ()> {
         self.0.send_timeout(item, duration)
+    }
+
+    #[inline(always)]
+    fn send_with_timer<'a, F, R>(&'a self, item: T, fut: F) -> SendTimeoutFuture<'a, T, R>
+    where
+        F: Future<Output = R> + 'static,
+    {
+        self.0.send_with_timer(item, fut)
     }
 }
 

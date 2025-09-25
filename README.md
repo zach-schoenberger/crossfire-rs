@@ -230,8 +230,10 @@ upon cancellation. Thus, we suggest using `AsyncTx::send_timeout()` instead.
 
 - `AsyncTx::send_timeout()`, which will return the message that failed to be sent in
 [SendTimeoutError]. We guarantee the result is atomic.
+Alternatively, you can use `AsyncTx::send_with_timer()`.
 
 - `AsyncRx::recv_timeout()`, we guarantee the result is atomic.
+Alternatively, you can use `crate::AsyncRx::recv_with_timer()`.
 
 * Between blocking context and async context, and between different async runtime instances.
 

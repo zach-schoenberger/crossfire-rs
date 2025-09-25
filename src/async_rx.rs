@@ -138,18 +138,65 @@ impl<T> AsyncRx<T> {
     #[cfg(any(feature = "tokio", feature = "async_std"))]
     #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     #[inline]
-    pub fn recv_timeout<'a>(&'a self, duration: std::time::Duration) -> RecvTimeoutFuture<'a, T> {
+    pub fn recv_timeout<'a>(
+        &'a self, duration: std::time::Duration,
+    ) -> RecvTimeoutFuture<'a, T, ()> {
         let sleep = {
             #[cfg(feature = "tokio")]
             {
-                Box::pin(tokio::time::sleep(duration))
+                tokio::time::sleep(duration)
             }
-            #[cfg(not(feature = "tokio"))]
+            #[cfg(feature = "async_std")]
             {
-                Box::pin(async_std::task::sleep(duration))
+                async_std::task::sleep(duration)
             }
         };
-        return RecvTimeoutFuture { rx: self, waker: None, sleep };
+        self.recv_with_timer(sleep)
+    }
+
+    /// Receives a message from the channel with a custom timer function (from other async runtime).
+    ///
+    /// The behavior is atomic: the message is either received successfully or the operation is canceled due to a timeout.
+    ///
+    /// Returns `Ok(T)` when successful.
+    ///
+    /// Returns Err([RecvTimeoutError::Timeout]) when a message could not be received because the channel is empty and the operation timed out.
+    ///
+    /// Returns Err([RecvTimeoutError::Disconnected]) if the sender has been dropped and the channel is empty.
+    ///
+    /// # Argument:
+    ///
+    /// * `fut`: The sleep function. It's possible to wrap this function with cancelable handle,
+    /// you can control when to stop polling. the return value of `fut` is ignore.
+    /// We add generic `R` just in order to support smol::Timer
+    ///
+    /// # Example:
+    ///
+    /// ```ignore
+    /// extern crate smol;
+    /// use std::time::Duration;
+    /// use crossfire::*;
+    /// async fn foo() {
+    ///     let (tx, rx) = mpmc::bounded_async::<usize>(10);
+    ///     match rx.recv_with_timer(smol::Timer::after(Duration::from_secs(1))).await {
+    ///         Ok(_item)=>{
+    ///             println!("message recv");
+    ///         }
+    ///         Err(RecvTimeoutError::Timeout)=>{
+    ///             println!("timeout");
+    ///         }
+    ///         Err(RecvTimeoutError::Disconnected)=>{
+    ///             println!("sender-side closed");
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    pub fn recv_with_timer<'a, F, R>(&'a self, fut: F) -> RecvTimeoutFuture<'a, T, R>
+    where
+        F: Future<Output = R> + 'static,
+    {
+        return RecvTimeoutFuture { rx: self, waker: None, sleep: Box::pin(fut) };
     }
 
     /// Attempts to receive a message from the channel without blocking.
@@ -328,15 +375,15 @@ impl<T> Future for RecvFuture<'_, T> {
 }
 
 /// A fixed-sized future object constructed by [AsyncRx::recv_timeout()]
-pub struct RecvTimeoutFuture<'a, T> {
+pub struct RecvTimeoutFuture<'a, T, R> {
     rx: &'a AsyncRx<T>,
     waker: Option<RecvWaker>,
-    sleep: Pin<Box<dyn Future<Output = ()>>>,
+    sleep: Pin<Box<dyn Future<Output = R>>>,
 }
 
-unsafe impl<T: Unpin + Send> Send for RecvTimeoutFuture<'_, T> {}
+unsafe impl<T: Unpin + Send, R> Send for RecvTimeoutFuture<'_, T, R> {}
 
-impl<T> Drop for RecvTimeoutFuture<'_, T> {
+impl<T, R> Drop for RecvTimeoutFuture<'_, T, R> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
             // cancelled
@@ -345,14 +392,14 @@ impl<T> Drop for RecvTimeoutFuture<'_, T> {
     }
 }
 
-impl<T> Future for RecvTimeoutFuture<'_, T> {
+impl<T, R> Future for RecvTimeoutFuture<'_, T, R> {
     type Output = Result<T, RecvTimeoutError>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
         let mut _self = self.get_mut();
         match _self.rx.poll_item(ctx, &mut _self.waker, false) {
             Err(TryRecvError::Empty) => {
-                if let Poll::Ready(()) = _self.sleep.as_mut().poll(ctx) {
+                if let Poll::Ready(_) = _self.sleep.as_mut().poll(ctx) {
                     return Poll::Ready(Err(RecvTimeoutError::Timeout));
                 }
                 return Poll::Pending;
@@ -391,7 +438,26 @@ pub trait AsyncRxTrait<T: Unpin + Send + 'static>:
     /// returns Err([RecvTimeoutError::Disconnected]) when all Tx dropped and channel is empty.
     #[cfg(any(feature = "tokio", feature = "async_std"))]
     #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
-    fn recv_timeout<'a>(&'a self, timeout: std::time::Duration) -> RecvTimeoutFuture<'a, T>;
+    fn recv_timeout<'a>(&'a self, timeout: std::time::Duration) -> RecvTimeoutFuture<'a, T, ()>;
+
+    /// Receives a message from the channel with a custom timer function (from other async runtime).
+    ///
+    /// The behavior is atomic: the message is either received successfully or the operation is canceled due to a timeout.
+    ///
+    /// Returns `Ok(T)` when successful.
+    ///
+    /// Returns Err([RecvTimeoutError::Timeout]) when a message could not be received because the channel is empty and the operation timed out.
+    ///
+    /// Returns Err([RecvTimeoutError::Disconnected]) if the sender has been dropped and the channel is empty.
+    ///
+    /// # Argument:
+    ///
+    /// * `fut`: The sleep function. It's possible to wrap this function with cancelable handle,
+    /// you can control when to stop polling. the return value of `fut` is ignore.
+    /// We add generic `R` just in order to support smol::Timer.
+    fn recv_with_timer<'a, F, R>(&'a self, fut: F) -> RecvTimeoutFuture<'a, T, R>
+    where
+        F: Future<Output = R> + 'static;
 
     /// Try to receive message, non-blocking.
     ///
@@ -450,8 +516,16 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
     #[cfg(any(feature = "tokio", feature = "async_std"))]
     #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     #[inline(always)]
-    fn recv_timeout<'a>(&'a self, duration: std::time::Duration) -> RecvTimeoutFuture<'a, T> {
+    fn recv_timeout<'a>(&'a self, duration: std::time::Duration) -> RecvTimeoutFuture<'a, T, ()> {
         AsyncRx::recv_timeout(self, duration)
+    }
+
+    #[inline(always)]
+    fn recv_with_timer<'a, F, R>(&'a self, fut: F) -> RecvTimeoutFuture<'a, T, R>
+    where
+        F: Future<Output = R> + 'static,
+    {
+        AsyncRx::recv_with_timer(self, fut)
     }
 
     #[inline(always)]
@@ -563,8 +637,16 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for MAsyncRx<T> {
     #[cfg(any(feature = "tokio", feature = "async_std"))]
     #[cfg_attr(docsrs, doc(cfg(any(feature = "tokio", feature = "async_std"))))]
     #[inline(always)]
-    fn recv_timeout<'a>(&'a self, duration: std::time::Duration) -> RecvTimeoutFuture<'a, T> {
+    fn recv_timeout<'a>(&'a self, duration: std::time::Duration) -> RecvTimeoutFuture<'a, T, ()> {
         self.0.recv_timeout(duration)
+    }
+
+    #[inline(always)]
+    fn recv_with_timer<'a, F, R>(&'a self, fut: F) -> RecvTimeoutFuture<'a, T, R>
+    where
+        F: Future<Output = R> + 'static,
+    {
+        self.0.recv_with_timer(fut)
     }
 }
 
