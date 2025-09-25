@@ -15,8 +15,14 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+      # We use cargo-nextest because cargo test does not forward cancellation signal
+    - uses: taiki-e/install-action@nextest
+
     - name: Run tests with async_std
       run: env WORKFLOW=1 make test_async_std
 
     - name: Run test with async_std release
       run: env WORKFLOW=1 make test_async_std_release
+
+    - name: Run test with async_std release and trace_log
+      run: WORKFLOW=1 exec cargo nextest run -F="async_std,trace_log" --hide-progress-bar -j 1 --no-capture -r
