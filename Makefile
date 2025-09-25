@@ -84,10 +84,25 @@ test_log_release:
 test_async_std_release:
 	@${RUNRELEASECASE}; FEATURE_FLAG="-F async_std"; _run_test_release_case
 
-.PHONY: test_async_std_release
+.PHONY: test_log_async_std_release
 test_log_async_std_release:
 	@${RUNRELEASECASE}; FEATURE_FLAG="-F async_std,trace_log"; _run_test_release_case
 
+.PHONY: test_smol
+test_smol:
+	@${RUNTESTCASE}; FEATURE_FLAG="-F smol"; _run_test_case
+
+.PHONY: test_log_smol
+test_log_smol:
+	@${RUNTESTCASE}; FEATURE_FLAG="-F smol,trace_log"; _run_test_case
+
+.PHONY: test_smol_release
+test_smol_release:
+	@${RUNRELEASECASE}; FEATURE_FLAG="-F smol"; _run_test_release_case
+
+.PHONY: test_log_smol_release
+test_log_smol_release:
+	@${RUNRELEASECASE}; FEATURE_FLAG="-F smol,trace_log"; _run_test_release_case
 
 .PHONY: build
 build: init

@@ -91,7 +91,7 @@ fn test_sync() {
         let (tx, rx) = spsc::bounded_async::<usize>(100);
         //  Example1: should fail to compile with Arc
         //    let tx = Arc::new(tx);
-        async_spawn!(async move {
+        let _task = async_spawn!(async move {
             let _ = tx.send(2).await;
         });
         drop(rx);
@@ -99,7 +99,7 @@ fn test_sync() {
         let (tx, rx) = mpsc::bounded_async::<usize>(100);
         //  example2: should fail to compile with Arc
         //    let rx = Arc::new(rx);
-        async_spawn!(async move {
+        let _task = async_spawn!(async move {
             let _ = rx.recv().await;
         });
         drop(tx);
@@ -107,7 +107,7 @@ fn test_sync() {
         let (tx, rx) = mpsc::bounded_blocking::<usize>(100);
         ////  example3: should fail to compile with Arc
         //    let rx = Arc::new(rx);
-        std::thread::spawn(move || {
+        let _task = std::thread::spawn(move || {
             let _ = rx.recv();
         });
         drop(tx);
@@ -1106,7 +1106,7 @@ fn test_basic_into_stream_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     runtime_block_on!(async move {
         let total_message = 100;
         let (tx, rx) = channel;
-        async_spawn!(async move {
+        let th = async_spawn!(async move {
             println!("sender thread send {} message start", total_message);
             for i in 0usize..total_message {
                 let _ = tx.send(i).await;
@@ -1120,7 +1120,8 @@ fn test_basic_into_stream_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
             assert_eq!(s.next().await, Some(_i));
         }
         assert_eq!(s.next().await, None);
-        assert!(s.is_terminated())
+        assert!(s.is_terminated());
+        async_join_result!(th);
     });
 }
 
