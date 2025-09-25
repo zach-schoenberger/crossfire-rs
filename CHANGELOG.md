@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.1.3] - 2025-09-26
+
+### Added
+
+- Add send_with_timer() and recv_with_timer() for other async runtime (eg. smol).
+
 ## [2.1.1-2.1.2]
 
 ### Changed
