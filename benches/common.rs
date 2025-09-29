@@ -93,3 +93,13 @@ macro_rules! async_join_result {
     }};
 }
 pub(super) use async_join_result;
+
+#[inline(always)]
+pub fn n_n() -> Vec<(usize, usize)> {
+    vec![(2, 2), (4, 4), (8, 8), (16, 16)]
+}
+
+#[inline(always)]
+pub fn n_1() -> Vec<usize> {
+    vec![1, 2, 4, 8, 16]
+}

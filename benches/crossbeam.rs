@@ -119,21 +119,21 @@ fn bench_crossbeam_bounded_sync(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossbeam_bounded");
     group.significance_level(0.1).sample_size(50);
     group.measurement_time(Duration::from_secs(20));
-    for input in [1, 2, 4, 8, 16] {
+    for input in n_1() {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpsc size 1", input), &param, |b, i| {
             b.iter(|| _crossbeam_bounded_sync(1, i.tx_count, i.rx_count, ONE_MILLION))
         });
     }
-    for input in [1, 2, 4, 8, 16] {
+    for input in n_1() {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpsc size 100", input), &param, |b, i| {
             b.iter(|| _crossbeam_bounded_sync(100, i.tx_count, i.rx_count, ONE_MILLION))
         });
     }
-    for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
+    for input in n_n() {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(
@@ -149,14 +149,14 @@ fn bench_crossbeam_unbounded_sync(c: &mut Criterion) {
     let mut group = c.benchmark_group("crossbeam_unbounded");
     group.significance_level(0.1).sample_size(50);
     group.measurement_time(Duration::from_secs(20));
-    for input in [1, 2, 4, 8, 16] {
+    for input in n_1() {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpsc", input), &param, |b, i| {
             b.iter(|| _crossbeam_unbounded_sync(i.tx_count, i.rx_count, ONE_MILLION))
         });
     }
-    for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
+    for input in n_n() {
         let param = Concurrency { tx_count: input.0, rx_count: input.1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpmc", param.to_string()), &param, |b, i| {

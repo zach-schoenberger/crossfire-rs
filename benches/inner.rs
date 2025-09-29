@@ -385,7 +385,7 @@ fn _bench_threads(c: &mut Criterion) {
     group.significance_level(0.1).sample_size(50);
     group.measurement_time(Duration::from_secs(10));
 
-    for input in [1, 2, 4, 8, 16] {
+    for input in n_1() {
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("weak_cell", input), &input, |b, i| {
             b.iter(|| _bench_weak_cell(*i))

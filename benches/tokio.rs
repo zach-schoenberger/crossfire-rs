@@ -52,7 +52,7 @@ fn bench_tokio_bounded(c: &mut Criterion) {
     let mut group = c.benchmark_group("tokio_bounded_100");
     group.significance_level(0.1).sample_size(50);
     group.measurement_time(Duration::from_secs(10));
-    for input in [1, 2, 4, 8, 16] {
+    for input in n_1() {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpsc", input), &param, |b, i| {
@@ -66,7 +66,7 @@ fn bench_tokio_unbounded(c: &mut Criterion) {
     let mut group = c.benchmark_group("tokio_unbounded");
     group.significance_level(0.1).sample_size(50);
     group.measurement_time(Duration::from_secs(10));
-    for input in [1, 2, 4, 8, 16] {
+    for input in n_1() {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpsc", input), &param, |b, i| {
