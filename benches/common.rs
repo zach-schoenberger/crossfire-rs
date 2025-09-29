@@ -50,7 +50,7 @@ impl AsyncExecutor for BenchExecutor {
     }
 }
 
-#[allow(dead_code)]
+#[allow(unused_macros)]
 macro_rules! async_spawn {
     ($f: expr) => {{
         #[cfg(feature = "smol")]
@@ -72,7 +72,7 @@ macro_rules! async_spawn {
 }
 pub(super) use async_spawn;
 
-#[allow(dead_code)]
+#[allow(unused_macros)]
 macro_rules! async_join_result {
     ($th: expr) => {{
         #[cfg(feature = "smol")]
@@ -94,6 +94,7 @@ macro_rules! async_join_result {
 }
 pub(super) use async_join_result;
 
+#[allow(dead_code)]
 #[inline(always)]
 pub fn n_n() -> Vec<(usize, usize)> {
     vec![(2, 2), (4, 4), (8, 8), (16, 16)]

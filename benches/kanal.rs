@@ -2,6 +2,7 @@ use criterion::*;
 use std::thread;
 use std::time::Duration;
 
+#[allow(unused_imports)]
 mod common;
 use common::*;
 
@@ -162,12 +163,10 @@ async fn _kanal_bounded_async(bound: usize, tx_count: usize, rx_count: usize, ms
         }
     }
     for th in th_tx {
-        let _ = th.await;
+        let _ = async_join_result!(th);
     }
     for th in th_rx {
-        if let Ok(count) = async_join_result!(th) {
-            recv_counter += count;
-        }
+        recv_counter += async_join_result!(th);
     }
     assert_eq!(send_counter, recv_counter);
 }
@@ -220,12 +219,10 @@ async fn _kanal_unbounded_async(tx_count: usize, rx_count: usize, msg_count: usi
         }
     }
     for th in th_tx {
-        let _ = th.await;
+        let _ = async_join_result!(th);
     }
     for th in th_rx {
-        if let Ok(count) = async_join_result!(th) {
-            recv_counter += count;
-        }
+        recv_counter += async_join_result!(th);
     }
     assert_eq!(send_counter, recv_counter);
 }

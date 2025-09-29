@@ -1,6 +1,7 @@
 use criterion::*;
 use std::time::Duration;
 
+#[allow(unused_imports)]
 mod common;
 use common::*;
 

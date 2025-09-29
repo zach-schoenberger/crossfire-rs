@@ -2,6 +2,7 @@ use criterion::*;
 use std::thread;
 use std::time::Duration;
 
+#[allow(unused_imports)]
 mod common;
 use common::*;
 
