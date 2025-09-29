@@ -69,8 +69,10 @@ pub struct ChannelShared<T> {
     pub(crate) inner: Channel<T>,
     pub(crate) senders: RegistrySender<T>,
     pub(crate) recvs: RegistryRecv,
-    pub(crate) large: bool,
     pub(crate) bound_size: Option<u32>,
+    pub(crate) backoff_limit: u16,
+    pub(crate) large: bool,
+    pub(crate) may_direct_copy: bool,
 }
 
 impl<T> ChannelShared<T> {
@@ -78,15 +80,38 @@ impl<T> ChannelShared<T> {
         inner: Channel<T>, senders: RegistrySender<T>, recvs: RegistryRecv,
     ) -> Arc<Self> {
         let bound_size;
-        let large;
+        let backoff_limit;
+        let mut large = false;
+        let may_direct_copy;
         if let Some(bound) = inner.capacity() {
             bound_size = Some(bound as u32);
-            large = bound > 10;
+            if bound >= 10 {
+                large = true;
+                backoff_limit = crate::backoff::DEFAULT_LIMIT;
+                may_direct_copy = true;
+            } else {
+                may_direct_copy = false;
+                #[cfg(target_arch = "x86_64")]
+                {
+                    backoff_limit = crate::backoff::DEFAULT_LIMIT;
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                {
+                    backoff_limit = crate::backoff::MAX_LIMIT;
+                }
+            }
         } else {
             bound_size = None;
-            large = false;
+            may_direct_copy = false;
+            #[cfg(target_arch = "x86_64")]
+            {
+                backoff_limit = crate::backoff::DEFAULT_LIMIT;
+            }
+            #[cfg(not(target_arch = "x86_64"))]
+            {
+                backoff_limit = crate::backoff::MAX_LIMIT;
+            }
         }
-
         Arc::new(Self {
             closed: AtomicBool::new(false),
             tx_count: AtomicUsize::new(1),
@@ -95,7 +120,9 @@ impl<T> ChannelShared<T> {
             senders,
             recvs,
             bound_size,
+            backoff_limit,
             large,
+            may_direct_copy,
             inner,
         })
     }
@@ -160,7 +187,7 @@ impl<T> ChannelShared<T> {
 
     #[inline(always)]
     pub(crate) fn sender_direct_copy(&self) -> bool {
-        self.senders.use_direct_copy(self)
+        self.may_direct_copy && self.senders.use_direct_copy(self)
     }
 
     /// Returns the number of wakers for senders and receivers. For debugging purposes.
@@ -404,9 +431,9 @@ impl<T> ChannelShared<T> {
             }
         }
         if self.bound_size > Some(0) && self.bound_size <= Some(2) {
-            return 6;
+            self.backoff_limit
         } else {
-            return 0;
+            0
         }
     }
 
@@ -423,9 +450,9 @@ impl<T> ChannelShared<T> {
             }
         }
         if self.bound_size > Some(0) && self.bound_size <= Some(2) {
-            return 6;
+            self.backoff_limit
         } else {
-            return 0;
+            0
         }
     }
 }
