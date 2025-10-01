@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.1.4] - 2025-10-01
+
+### Changed
+
+- Adjust backoff for Arm  (increase size 1 speed)
+
+- async: Use try_change_state() to reset init instead of get_state(), (Minor improvement on x86 bounded_100_async_n_n)
+
 ## [2.1.3] - 2025-09-26
 
 ### Added
