@@ -91,15 +91,15 @@ Some hidden bug (especially atomic ops on weaker ordering platform) might occur:
 <td>PASSED</td>
 </tr>
 <tr>
-<td>tokio-1.47.1 <br/>
-<a href="https://github.com/tokio-rs/tokio/issues/7632">tokio issue 7632 (opened)</a><br/>
-<a href="https://github.com/tokio-rs/tokio/pull/7622">tokio PR #7622 (unrelease)</a>
+<td>tokio-1.47.1
 </td>
 <td>
 <a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_dev_arm.yml">cron_dev_arm</a><br/>
 <a href="https://github.com/frostyplanet/crossfire-rs/actions/workflows/cron_dev_arm_trace.yml">cron_dev_arm with trace_log</a>
 </td>
-<td>DEADLOCK (not resolved)</td>
+<td>(UNRESOLVED) Use tokio latest master branch which includes <a href="https://github.com/tokio-rs/tokio/pull/7622">tokio PR #7622 (unrelease)</a>, and avoid using current-thread runtime
+(remaining issue: <a href="https://github.com/tokio-rs/tokio/issues/7632">tokio issue 7632 (opened)</a>)
+ </td>
 </tr>
 <tr>
 <td>async-std</td>
@@ -150,6 +150,14 @@ v2.0.26 (legacy):
 <tr><td>async-std</td>
 </tr>
 </table>
+
+### Debugging deadlock issue
+
+**Debug locally**:
+
+Use `--features trace_log` to run the bench or test until it hangs, then press `ctrl+c` or send `SIGINT`,  there will be latest log dump to /tmp/crossfire_ring.log (refer to tests/common.rs `_setup_log()`)
+
+**Debug with github workflow**:  https://github.com/frostyplanet/crossfire-rs/issues/37
 
 ## APIs
 
