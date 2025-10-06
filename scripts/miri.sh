@@ -12,5 +12,5 @@ echo "MIRI_SEED" $MIRI_SEED
 MIRIFLAGS="$MIRIFLAGS -Zmiri-seed=$MIRI_SEED -Zmiri-disable-isolation -Zmiri-no-short-fd-operations -Zmiri-backtrace=full -Zmiri-permissive-provenance"
 export MIRIFLAGS
 echo $MIRIFLAGS
-
-RUSTFLAGS="--cfg tokio_unstable" RUST_BACKTRACE=1 cargo +nightly miri test $@ -- --no-capture --test-threads=1
+# --all-targets: to skip doctest
+RUSTFLAGS="--cfg tokio_unstable" RUST_BACKTRACE=1 cargo +nightly miri test --all-targets $@ -- --no-capture --test-threads=1
