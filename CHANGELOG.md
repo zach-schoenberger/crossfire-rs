@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.1.5] - 2025-10-06
+
+### Fixed
+
+- Remove doc_auto_cfg because removal by rust
+
 ## [2.1.4] - 2025-10-01
 
 ### Changed
