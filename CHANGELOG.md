@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.1.6] - 2025-10-10
+
+### Changed
+
+- Delete the code probing tokio (to prevent an issue in cargo 1.87-1.90 triggering the code without tokio feature enable)
+
 ## [2.1.5] - 2025-10-06
 
 ### Fixed
