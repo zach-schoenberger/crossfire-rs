@@ -32,7 +32,10 @@ pub fn detect_backoff_cfg() {
     {
         // For one core (like VM machine), better use yield_now instead of spin_loop.
         DETECT_CONFIG.store(
+            #[cfg(target_arch = "x86_64")]
             BackoffConfig { spin_limit: 0, limit: DEFAULT_LIMIT }.to_u32(),
+            #[cfg(not(target_arch = "x86_64"))]
+            BackoffConfig { spin_limit: 0, limit: MAX_LIMIT }.to_u32(),
             Ordering::Release,
         );
     }

@@ -1,4 +1,3 @@
-use crate::backoff::*;
 use crate::sink::AsyncSink;
 #[cfg(feature = "trace_log")]
 use crate::tokio_task_id;
@@ -10,10 +9,7 @@ use std::marker::PhantomData;
 use std::mem::{needs_drop, MaybeUninit};
 use std::ops::Deref;
 use std::pin::Pin;
-use std::sync::{
-    atomic::{AtomicU32, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 /// A single producer (sender) that works in an async context.
@@ -60,7 +56,6 @@ pub struct AsyncTx<T> {
     pub(crate) shared: Arc<ChannelShared<T>>,
     // Remove the Sync marker to prevent being put in Arc
     _phan: PhantomData<Cell<()>>,
-    backoff: AtomicU32,
 }
 
 impl<T> fmt::Debug for AsyncTx<T> {
@@ -93,20 +88,7 @@ impl<T> From<Tx<T>> for AsyncTx<T> {
 impl<T> AsyncTx<T> {
     #[inline]
     pub(crate) fn new(shared: Arc<ChannelShared<T>>) -> Self {
-        Self { shared, _phan: Default::default(), backoff: AtomicU32::new(0) }
-    }
-
-    #[inline(always)]
-    pub(crate) fn get_backoff_cfg(&self) -> BackoffConfig {
-        let backoff = self.backoff.load(Ordering::Relaxed);
-        if backoff == 0 {
-            let backoff_limit = self.shared.detect_async_backoff_tx();
-            let config = BackoffConfig { spin_limit: SPIN_LIMIT, limit: backoff_limit };
-            self.backoff.store(config.to_u32(), Ordering::Release);
-            return config;
-        } else {
-            return BackoffConfig::from_u32(backoff);
-        }
+        Self { shared, _phan: Default::default() }
     }
 
     #[inline]
@@ -293,17 +275,15 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
                     }
                 }
             } else {
-                let cfg = self.get_backoff_cfg();
-                if cfg.limit > 0 {
-                    let mut _backoff = Backoff::new(cfg);
+                if let Some(mut backoff) = shared.get_async_backoff() {
                     loop {
-                        _backoff.spin();
+                        backoff.spin();
                         if shared.send(item) {
                             shared.on_send();
                             trace_log!("tx{:?}: send", tokio_task_id!());
                             return Poll::Ready(Ok(()));
                         }
-                        if _backoff.is_completed() {
+                        if backoff.is_completed() {
                             break;
                         }
                     }

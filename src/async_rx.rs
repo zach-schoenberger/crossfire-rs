@@ -1,4 +1,3 @@
-use crate::backoff::*;
 use crate::stream::AsyncStream;
 #[cfg(feature = "trace_log")]
 use crate::tokio_task_id;
@@ -9,10 +8,7 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::pin::Pin;
-use std::sync::{
-    atomic::{AtomicU32, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 /// A single consumer (receiver) that works in an async context.
@@ -61,7 +57,6 @@ pub struct AsyncRx<T> {
     pub(crate) shared: Arc<ChannelShared<T>>,
     // Remove the Sync marker to prevent being put in Arc
     _phan: PhantomData<Cell<()>>,
-    backoff: AtomicU32,
 }
 
 unsafe impl<T: Send> Send for AsyncRx<T> {}
@@ -94,20 +89,7 @@ impl<T> From<Rx<T>> for AsyncRx<T> {
 impl<T> AsyncRx<T> {
     #[inline]
     pub(crate) fn new(shared: Arc<ChannelShared<T>>) -> Self {
-        Self { shared, _phan: Default::default(), backoff: AtomicU32::new(0) }
-    }
-
-    #[inline(always)]
-    pub(crate) fn get_backoff_cfg(&self) -> BackoffConfig {
-        let backoff = self.backoff.load(Ordering::Relaxed);
-        if backoff == 0 {
-            let backoff_limit = self.shared.detect_async_backoff_rx();
-            let config = BackoffConfig { spin_limit: SPIN_LIMIT, limit: backoff_limit };
-            self.backoff.store(config.to_u32(), Ordering::Release);
-            return config;
-        } else {
-            return BackoffConfig::from_u32(backoff);
-        }
+        Self { shared, _phan: Default::default() }
     }
 
     /// Receives a message from the channel. This method will await until a message is received or the channel is closed.
@@ -280,9 +262,7 @@ impl<T> AsyncRx<T> {
                 }
             } else {
                 // First call
-                let cfg = self.get_backoff_cfg();
-                if cfg.limit > 0 {
-                    let mut backoff = Backoff::new(cfg);
+                if let Some(mut backoff) = shared.get_async_backoff() {
                     loop {
                         backoff.spin();
                         if let Some(item) = shared.try_recv() {

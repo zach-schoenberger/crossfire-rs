@@ -418,42 +418,17 @@ impl<T> ChannelShared<T> {
         }
     }
 
-    #[inline]
-    pub(crate) fn detect_async_backoff_tx(&self) -> u16 {
-        // Async parameter is determine by runtime,
-        // like tokio you might have multiple runtime. So the result should stored in
-        // sender and receivers, not in the ChannelShared
-        #[cfg(feature = "tokio")]
-        {
-            use tokio::runtime::Handle;
-            if Handle::current().metrics().num_workers() <= 1 {
-                return 0;
-            }
+    #[inline(always)]
+    pub(crate) fn get_async_backoff(&self) -> Option<Backoff> {
+        if self.large {
+            return None;
         }
-        if self.bound_size > Some(0) && self.bound_size <= Some(2) {
-            self.backoff_limit
-        } else {
-            0
+        let cfg = BackoffConfig::default();
+        if cfg.spin_limit == 0 {
+            // 1 core don't backoff
+            return None;
         }
-    }
-
-    #[inline]
-    pub(crate) fn detect_async_backoff_rx(&self) -> u16 {
-        // Async parameter is determine by runtime,
-        // like tokio you might have multiple runtime. So the result should stored in
-        // sender and receivers, not in the ChannelShared
-        #[cfg(feature = "tokio")]
-        {
-            use tokio::runtime::Handle;
-            if Handle::current().metrics().num_workers() <= 1 {
-                return 0;
-            }
-        }
-        if self.bound_size > Some(0) && self.bound_size <= Some(2) {
-            self.backoff_limit
-        } else {
-            0
-        }
+        Some(Backoff::new(cfg))
     }
 }
 
