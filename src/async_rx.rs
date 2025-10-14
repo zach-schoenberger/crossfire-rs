@@ -261,17 +261,29 @@ impl<T> AsyncRx<T> {
                     }
                     Err(state) => {
                         if state < WakerState::Waked as u8 {
-                            if waker.will_wake(ctx) {
-                                // Spurious waked by runtime, or
-                                // Normally only selection or multiplex future will get here.
-                                // No need to reg again, since waker is not consumed.
-                                trace_log!("rx{:?}: will_wake {:?}", tokio_task_id!(), waker);
-                                break;
-                            } else {
+                            // ARM based processors on tokio are not reliable,
+                            // so we need to treat this as if the waker will not wake.
+                            #[cfg(target_arch = "aarch64")]
+                            {
                                 // Spurious waked by runtime, waker can not be re-used (issue 38)
                                 shared.recvs.cancel_waker(&waker);
                                 trace_log!("rx{:?}: drop waker {:?}", tokio_task_id!(), waker);
                                 let _ = o_waker.take(); // waker cannot be used again
+                            }
+                            #[cfg(not(target_arch = "aarch64"))]
+                            {
+                                if waker.will_wake(ctx) {
+                                    // Spurious waked by runtime, or
+                                    // Normally only selection or multiplex future will get here.
+                                    // No need to reg again, since waker is not consumed.
+                                    trace_log!("rx{:?}: will_wake {:?}", tokio_task_id!(), waker);
+                                    break;
+                                } else {
+                                    // Spurious waked by runtime, waker can not be re-used (issue 38)
+                                    shared.recvs.cancel_waker(&waker);
+                                    trace_log!("rx{:?}: drop waker {:?}", tokio_task_id!(), waker);
+                                    let _ = o_waker.take(); // waker cannot be used again
+                                }
                             }
                         } else if state == WakerState::Closed as u8 {
                             break;

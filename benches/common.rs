@@ -3,6 +3,51 @@ use std::future::Future;
 
 use criterion::async_executor::AsyncExecutor;
 
+pub fn _setup_log() {
+    #[cfg(feature = "trace_log")]
+    {
+        use captains_log::*;
+        let format = recipe::LOG_FORMAT_THREADED_DEBUG;
+        #[cfg(miri)]
+        {
+            let _ = std::fs::remove_file("/tmp/crossfire_miri.log");
+            let file = LogRawFile::new("/tmp", "crossfire_miri.log", Level::Debug, format);
+            captains_log::Builder::default()
+                .tracing_global()
+                .add_sink(file)
+                .test()
+                .build()
+                .expect("log setup");
+        }
+        #[cfg(not(miri))]
+        {
+            let ring = ringfile::LogRingFile::new(
+                "/tmp/crossfire_ring.log",
+                500 * 1024 * 1024,
+                Level::Debug,
+                format,
+            );
+            let mut config = Builder::default()
+                .signal(signal_consts::SIGINT)
+                .signal(signal_consts::SIGTERM)
+                .tracing_global()
+                .add_sink(ring)
+                .add_sink(LogConsole::new(
+                    ConsoleTarget::Stdout,
+                    Level::Info,
+                    recipe::LOG_FORMAT_DEBUG,
+                ));
+            config.dynamic = true;
+            config.build().expect("log_setup");
+        }
+    }
+    #[cfg(not(feature = "trace_log"))]
+    {
+        use captains_log::*;
+        let _ = recipe::env_logger("LOG_FILE", "LOG_LEVEL").build().expect("log setup");
+    }
+}
+
 #[allow(dead_code)]
 pub const ONE_MILLION: usize = 1000000;
 #[allow(dead_code)]
@@ -70,7 +115,7 @@ macro_rules! async_spawn {
         }
     }};
 }
-pub(super) use async_spawn;
+pub(crate) use async_spawn;
 
 #[allow(unused_macros)]
 macro_rules! async_join_result {
@@ -92,7 +137,7 @@ macro_rules! async_join_result {
         }
     }};
 }
-pub(super) use async_join_result;
+pub(crate) use async_join_result;
 
 #[allow(dead_code)]
 #[inline(always)]

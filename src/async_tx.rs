@@ -276,16 +276,28 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
                     }
                     Err(state) => {
                         if state < WakerState::Waked as u8 {
-                            if waker.will_wake(ctx) {
-                                trace_log!("tx{:?}: will_wake {:?}", tokio_task_id!(), waker);
-                                // Normally only selection or multiplex future will get here.
-                                // No need to reg again, since waker is not consumed.
-                                return Poll::Pending;
-                            } else {
+                            // ARM based processors on tokio are not reliable,
+                            // so we need to treat this as if the waker will not wake.
+                            #[cfg(target_arch = "aarch64")]
+                            {
                                 // Spurious waked by runtime, waker can not be re-used (issue 38)
                                 self.senders.cancel_waker(waker);
                                 trace_log!("tx{:?}: drop waker {:?}", tokio_task_id!(), waker);
                                 let _ = o_waker.take();
+                            }
+                            #[cfg(not(target_arch = "aarch64"))]
+                            {
+                                if waker.will_wake(ctx) {
+                                    trace_log!("tx{:?}: will_wake {:?}", tokio_task_id!(), waker);
+                                    // Normally only selection or multiplex future will get here.
+                                    // No need to reg again, since waker is not consumed.
+                                    return Poll::Pending;
+                                } else {
+                                    // Spurious waked by runtime, waker can not be re-used (issue 38)
+                                    self.senders.cancel_waker(waker);
+                                    trace_log!("tx{:?}: drop waker {:?}", tokio_task_id!(), waker);
+                                    let _ = o_waker.take();
+                                }
                             }
                         } else if state == WakerState::Closed as u8 {
                             return Poll::Ready(Err(()));
